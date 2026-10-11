@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS floor_elements (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL CHECK(kind IN ('wall','column','door','window','label')),
+ label TEXT NOT NULL DEFAULT '',
+ x REAL NOT NULL DEFAULT 0, y REAL NOT NULL DEFAULT 0,
+ w REAL NOT NULL DEFAULT 80, h REAL NOT NULL DEFAULT 20, rotation REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_floor_elements_room ON floor_elements(room_id);
