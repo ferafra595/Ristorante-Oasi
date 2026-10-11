@@ -178,5 +178,22 @@ a:hover .oasi-arrow{transform:translate(2px,-3px)}
 @media(max-width:900px){.oasi-reviews,.oasi-faq{grid-template-columns:1fr}.oasi-reviews{padding-top:75px;padding-bottom:75px}.oasi-faq{padding:65px 25px;border-radius:28px}.oasi-reviews-visual{min-height:290px}}@media(max-width:560px){.oasi-reviews-visual{padding:30px;border-radius:25px}.oasi-faq-item summary{font-size:16px;padding:21px 2px}.oasi-faq{margin-bottom:50px}.reviews-actions{align-items:stretch;flex-direction:column}.reviews-actions .btn{justify-content:center}}
 @media(prefers-reduced-motion:reduce){.faq-plus,.oasi-faq-item[open] p{animation:none;transition:none}}
 
-/* Accesso amministratore a password unica */
-.login-card #login label{display:block;margin-bottom:18px}.login-card #login input[type="password"]{width:100%}
+/* ADMIN Control: controlli touch e strutture piantina */
+.admin-quick-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:22px 0 26px}
+.admin-quick-actions button{background:#f7f3ed;border:1px solid #e6dacf;border-radius:18px;padding:18px;text-align:left;font:600 14px/1.45 inherit;color:#302820;cursor:pointer;transition:background .2s,transform .2s,box-shadow .2s;min-height:72px}
+.admin-quick-actions button:hover{background:#eee6da;transform:translateY(-2px);box-shadow:0 10px 26px #33261810}
+.floor-board{position:relative;overflow:auto;touch-action:pan-x pan-y;min-width:780px;min-height:490px;background-color:#f8f5ef;background-image:linear-gradient(#d6ccbd66 1px,transparent 1px),linear-gradient(90deg,#d6ccbd66 1px,transparent 1px);background-size:25px 25px}
+.floor-layout>.panel:first-child{overflow-x:auto}
+.floor-structure{position:absolute;display:grid;place-items:center;border:1px solid #88755c;background:#cfc0aa;color:#37312c;cursor:pointer;z-index:1;padding:0 3px;font-weight:700;font-size:11px;line-height:1.1;overflow:hidden;border-radius:3px;box-sizing:border-box}
+.floor-structure.kind-wall{background:#605549;border-color:#514638;color:#fff}
+.floor-structure.kind-column{background:#aa9c89;border:2px solid #675b4b;border-radius:50%}
+.floor-structure.kind-door{background:#fff8ed;border:2px dashed #b59365;border-radius:12px;color:#7b5d3b}
+.floor-structure.kind-window{background:#c9e1e4;border-color:#789ca4;color:#294f56}
+.floor-structure.kind-label{background:#ffffffd9;border:1px dashed #bea78e;color:#62503c;border-radius:8px}
+.floor-structure:hover,.floor-structure:focus-visible{outline:3px solid #b3926d;outline-offset:3px}
+.admin-photo-upload{margin:8px 0 18px;padding:12px;border:1px dashed #d5c5b0;border-radius:15px;background:#faf7f1;display:grid;gap:9px}
+.admin-photo-upload input[type=file]{display:block;width:100%;margin-top:8px;font-size:14px}
+.admin-photo-upload button{justify-self:start}.upload-feedback{font-size:12px;color:#6f604e}
+@media(max-width:760px){.admin-main{min-width:0}.admin-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.admin-quick-actions button{padding:14px;min-height:72px}.admin .toolbar{flex-wrap:wrap;gap:10px}.admin .toolbar button,.admin .toolbar label{max-width:100%}.floor-layout{display:block}.floor-layout>aside{margin-top:16px}.admin-mobile{position:sticky;top:0;z-index:30;background:#faf8f4;padding:10px 0}}
+@media(max-width:380px){.admin-quick-actions{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.admin-quick-actions button{transition:none}}
