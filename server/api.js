@@ -6,6 +6,13 @@ const rand=()=>{const x=crypto.getRandomValues(new Uint8Array(32));return Array.
 const digest=async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))),b=>b.toString(16).padStart(2,'0')).join('');
 async function passwordHash(p,salt=rand().slice(0,32)){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);const bytes=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:210000,hash:'SHA-256'},k,256);return salt+':'+Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('')}
 async function verifyPassword(p,h){const [s]=h.split(':');return (await passwordHash(p,s))===h}
+// Compara segreti senza fermarsi alla prima differenza.
+async function equalSecret(a,b){
+ const [ha,hb]=await Promise.all([crypto.subtle.digest('SHA-256',new TextEncoder().encode(a)),crypto.subtle.digest('SHA-256',new TextEncoder().encode(b))]);
+ const x=new Uint8Array(ha),y=new Uint8Array(hb);let diff=0;
+ for(let i=0;i<x.length;i++)diff|=x[i]^y[i];return diff===0;
+}
+
 const read=async r=>{try{return await r.json()}catch{return {}}};
 const config=async(db,k)=>{const x=await db.prepare('SELECT value FROM settings WHERE key=?').bind(k).first();return x?JSON.parse(x.value):{}};
 const dateOk=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
@@ -22,7 +29,32 @@ async function validateBooking(db,b,admin=false){const cfg=await config(db,'book
 const hours=cfg[svc]||{};if(!admin){if(!hours.enabled||minutes(tm)<minutes(hours.start||'00:00')||minutes(tm)>minutes(hours.last||hours.end||'23:59'))throw Error('Orario non prenotabile');const italyNow=new Date(Date.now()+(Number(cfg.minNoticeMinutes)||0)*60000).toLocaleString('sv-SE',{timeZone:'Europe/Rome'}).replace(' ','T');if(d===today()&&(d+'T'+tm)<italyNow)throw Error('Prenotazione troppo vicina all’orario attuale')}const party=Number(b.party_size);if(!Number.isInteger(party)||party<1||party>(admin?200:Number(cfg.maxOnline||9)))throw Error(admin?'Numero persone non valido':'Per gruppi da 10 persone chiamaci direttamente');const rooms=await db.prepare(`SELECT id FROM rooms WHERE ${admin?'internal_enabled=1':'public_enabled=1'} ORDER BY sort_order,id`).all();const ids=rooms.results.map(r=>r.id).filter(id=>admin||!cfg.disabledDatesByRoom?.[String(id)]?.includes(d));return {cfg,d,tm,svc,party,ids}}
 async function saveBooking(ctx,b,admin=false){const db=ctx.env.DB;const {d,tm,svc,party,ids}=await validateBooking(db,b,admin);const name=clean(b.name,120),phone=clean(b.phone,40),mail=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600);if(!name||!phone||(!admin&&!/^\S+@\S+\.\S+$/.test(mail)))throw Error('Inserisci nome, telefono e indirizzo email valido');const usable=(admin&&b.room_id)?[Number(b.room_id)]:ids;let opts=await candidates(db,usable,d,svc,party);if(admin&&b.table_ids?.length){const requested=b.table_ids.map(Number);const match=opts.find(o=>o.ids.length===requested.length&&o.ids.every(id=>requested.includes(id)));if(!match)throw Error('Tavoli selezionati non disponibili o non compatibili');else opts=[match,...opts.filter(o=>o!==match)]}
 if(!opts.length)throw Error('Nessun tavolo disponibile per questo numero di persone');const token=rand(),hashed=await digest(token);let lastError;for(const o of opts){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert]);const id=seq[0].meta.last_row_id;try{await db.batch(o.ids.map(tid=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,tid,d,svc)))}catch(e){await db.prepare('DELETE FROM reservations WHERE id=?').bind(id).run();throw e}const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;ctx.waitUntil(email(ctx.env,mail,'Prenotazione confermata · Ristorante Oasi',`<h2>Prenotazione confermata</h2><p>Grazie ${esc(name)}. Ti aspettiamo il ${esc(d)} alle ${esc(tm)} (${party} persone).</p><p>Per annullare: <a href="${esc(cancellation)}">Annulla prenotazione</a></p>`));return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)}}catch(e){lastError=e;if(!String(e).includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
-async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){const row=await db.prepare('SELECT * FROM users WHERE email=?').bind(clean(b.email,180).toLowerCase()).first();if(!row||!(await verifyPassword(String(b.password||''),row.password_hash)))return fail('Credenziali non valide',401);const token=rand(),exp=new Date(Date.now()+7*86400000).toISOString();await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),row.id,exp).run();return json({ok:true,email:row.email},200,{'set-cookie':cookie(token,new URL(ctx.request.url).protocol==='https:')})}
+async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
+ const loginEmail=clean(b.email,180).toLowerCase(),loginPass=String(b.password||'');
+ const configuredEmail=clean(ctx.env.ADMIN_EMAIL,180).toLowerCase();
+ const configuredPass=ctx.env.ADMIN_PASSWORD;
+ const cloudflareMode=Boolean(configuredEmail||configuredPass);
+ let row;
+ if(cloudflareMode){
+  if(!configuredEmail||typeof configuredPass!=='string'||configuredPass.length<12)return fail('Configurazione ADMIN incompleta: imposta ADMIN_EMAIL e ADMIN_PASSWORD (almeno 12 caratteri) su Cloudflare',503);
+  if(loginEmail!==configuredEmail||!(await equalSecret(loginPass,configuredPass)))return fail('Credenziali non valide',401);
+  // L'utente viene creato in D1 automaticamente; l'account serve alle sessioni esistenti.
+  row=await db.prepare('SELECT * FROM users WHERE email=?').bind(configuredEmail).first();
+  const hashed=await passwordHash(configuredPass);
+  if(!row){
+   await db.prepare('INSERT INTO users(email,password_hash) VALUES(?,?)').bind(configuredEmail,hashed).run();
+   row=await db.prepare('SELECT * FROM users WHERE email=?').bind(configuredEmail).first();
+  }else if(!(await verifyPassword(configuredPass,row.password_hash))){
+   await db.batch([db.prepare('DELETE FROM sessions WHERE user_id=?').bind(row.id),db.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(hashed,row.id)]);
+  }
+ }else{
+  row=await db.prepare('SELECT * FROM users WHERE email=?').bind(loginEmail).first();
+  if(!row||!(await verifyPassword(loginPass,row.password_hash)))return fail('Credenziali non valide',401);
+ }
+ const token=rand(),exp=new Date(Date.now()+7*86400000).toISOString();
+ await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),row.id,exp).run();
+ return json({ok:true,email:row.email},200,{'set-cookie':cookie(token,new URL(ctx.request.url).protocol==='https:')});
+}
 const user=await currentUser(db,ctx.request);if(!user)return fail('Accesso richiesto',401);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
