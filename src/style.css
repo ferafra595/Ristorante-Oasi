@@ -81,8 +81,8 @@ a:hover .oasi-arrow{transform:translate(2px,-3px)}
 .gallery-premium .gallery-tile img{transition:transform .55s ease}
 .gallery-premium .gallery-tile:hover img{transform:scale(1.055)}
 .gallery-premium .gallery-caption{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:26px 24px 20px;color:white;font-weight:600;background:linear-gradient(transparent,rgba(0,0,0,.65))}
-.oasi-events{display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(28px,5vw,100px);align-items:center;background:#f6f1ea;border-radius:38px;margin:35px auto;overflow:hidden}
-.oasi-events-image{height:100%;min-height:390px;overflow:hidden}
+.oasi-events{display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(28px,5vw,100px);align-items:center;background:#f6f1ea;border-radius:38px;margin:35px auto;overflow:hidden;box-shadow:0 24px 60px rgba(62,47,31,.10)}
+.oasi-events-image{height:100%;min-height:390px;overflow:hidden;border-radius:34px;margin:24px 0 24px 24px;box-shadow:0 20px 55px rgba(62,47,31,.12)}
 .oasi-events-image img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .7s ease}
 .oasi-events:hover img{transform:scale(1.035)}
 .oasi-events-copy{padding:45px 60px 45px 0}
@@ -102,8 +102,8 @@ a:hover .oasi-arrow{transform:translate(2px,-3px)}
 .oasi-enquiry-form label{display:grid;gap:8px;font-size:13px;font-weight:600;color:#514b44}
 .oasi-enquiry-form input,.oasi-enquiry-form select,.oasi-enquiry-form textarea{background:#faf8f4;border:1px solid #e8dfd4;border-radius:12px;padding:13px;font:inherit;color:#292520;width:100%;box-sizing:border-box}
 .oasi-enquiry-form .small-note{font-size:12px;margin:0}
-@media(max-width:820px){.oasi-events,.oasi-event-enquiry{grid-template-columns:1fr}.oasi-events-image{min-height:260px;height:300px}.oasi-events-copy{padding:8px 26px 34px}.oasi-event-types{grid-template-columns:1fr}.oasi-event-photos{grid-template-columns:1fr 1fr}}
-@media(max-width:560px){.oasi-events{border-radius:25px}.oasi-map-wrap iframe{height:190px}.oasi-event-photos{grid-template-columns:1fr}.oasi-event-enquiry{gap:20px}.oasi-enquiry-form{padding:20px}.oasi-event-photos img{height:240px}}
+@media(max-width:820px){.oasi-events,.oasi-event-enquiry{grid-template-columns:1fr}.oasi-events-image{min-height:260px;height:300px;margin:22px 22px 0;border-radius:28px}.oasi-events-copy{padding:8px 26px 34px}.oasi-event-types{grid-template-columns:1fr}.oasi-event-photos{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.oasi-events{border-radius:25px}.oasi-events-image{margin:18px 18px 0;border-radius:24px}.oasi-map-wrap iframe{height:190px}.oasi-event-photos{grid-template-columns:1fr}.oasi-event-enquiry{gap:20px}.oasi-enquiry-form{padding:20px}.oasi-event-photos img{height:240px}}
 @media(prefers-reduced-motion:reduce){.gallery-premium .gallery-tile img,.oasi-events-image img{transition:none!important}}
 
 /* V5 – Esperienze realmente utili */
