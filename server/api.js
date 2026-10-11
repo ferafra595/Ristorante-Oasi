@@ -4,7 +4,7 @@ const now=()=>new Date().toISOString();
 const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'});
 const rand=()=>{const x=crypto.getRandomValues(new Uint8Array(32));return Array.from(x,b=>b.toString(16).padStart(2,'0')).join('')};
 const digest=async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))),b=>b.toString(16).padStart(2,'0')).join('');
-async function passwordHash(p,salt=rand().slice(0,32)){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);const bytes=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:210000,hash:'SHA-256'},k,256);return salt+':'+Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('')}
+async function passwordHash(p,salt=rand().slice(0,32)){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);const bytes=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},k,256);return salt+':'+Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('')}
 async function verifyPassword(p,h){const [s]=h.split(':');return (await passwordHash(p,s))===h}
 // Compara segreti senza fermarsi alla prima differenza.
 async function equalSecret(a,b){
@@ -36,15 +36,21 @@ async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET
  const supplied=String(b.password||'');
  if(!supplied||!(await equalSecret(supplied,configuredPass)))return fail('Password non valida',401);
  const internalEmail='oasi-admin@internal.invalid'; // solo identificatore tecnico D1, non email di accesso
- const hashed=await passwordHash(configuredPass);
- await db.prepare('INSERT OR IGNORE INTO users(email,password_hash) VALUES(?,?)').bind(internalEmail,hashed).run();
- const row=await db.prepare('SELECT * FROM users WHERE email=?').bind(internalEmail).first();
- if(!(await verifyPassword(configuredPass,row.password_hash))){
-  await db.batch([db.prepare('DELETE FROM sessions'),db.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(hashed,row.id)]);
- }else{
-  // La nuova modalità impedisce l'utilizzo delle sessioni create per vecchi account email.
-  await db.prepare('DELETE FROM sessions WHERE user_id<>?').bind(row.id).run();
+ // Deriva una sola volta una nuova impronta compatibile con Cloudflare (max 100.000 iterazioni).
+ // Il segreto di Cloudflare e' gia' stato verificato: non occorre ricalcolare la password
+ // una seconda volta. Se l'account usa ancora l'hash precedente, aggiorna e invalida
+ // le sessioni esistenti, senza cancellare dati o modificare le credenziali.
+ const rowBefore=await db.prepare('SELECT * FROM users WHERE email=?').bind(internalEmail).first();
+ const storedSalt=rowBefore?.password_hash?.split(':')[0];
+ const hashed=await passwordHash(configuredPass,storedSalt&&/^[a-f0-9]{32}$/.test(storedSalt)?storedSalt:undefined);
+ if(!rowBefore){
+  await db.prepare('INSERT INTO users(email,password_hash) VALUES(?,?)').bind(internalEmail,hashed).run();
+ }else if(rowBefore.password_hash!==hashed){
+  await db.batch([db.prepare('DELETE FROM sessions WHERE user_id=?').bind(rowBefore.id),db.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(hashed,rowBefore.id)]);
  }
+ const row=await db.prepare('SELECT id FROM users WHERE email=?').bind(internalEmail).first();
+ // Un solo account autorizzato: le vecchie sessioni email non danno accesso all'ADMIN.
+ await db.prepare('DELETE FROM sessions WHERE user_id<>?').bind(row.id).run();
  const token=rand(),exp=new Date(Date.now()+7*86400000).toISOString();
  await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),row.id,exp).run();
  return json({ok:true},200,{'set-cookie':cookie(token,new URL(ctx.request.url).protocol==='https:')});
