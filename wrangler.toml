@@ -10,7 +10,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "oasi-db"
-database_id = "INSERISCI_ID_DATABASE_D1"
+database_id = "f8247322-1e5a-4328-b06c-8ed38194f569"
 migrations_dir = "migrations"
 [[r2_buckets]]
 binding = "MEDIA"
