@@ -1,0 +1,4 @@
+SETUP_KEY=crea-una-chiave-lunga-e-casuale
+# Facoltativo, solo dopo attivazione provider email e dominio verificato:
+# RESEND_API_KEY=re_xxx
+# EMAIL_FROM=Oasi <prenotazioni@tuodominio.it>

@@ -1,0 +1,19 @@
+{
+  "name": "oasi-ristorante",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && wrangler dev",
+    "dev:ui": "npm run build && python3 -m http.server 8080 --directory dist",
+    "build": "node build.mjs",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "db:local": "wrangler d1 migrations apply oasi-db --local",
+    "db:remote": "wrangler d1 migrations apply oasi-db --remote"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+import {mkdir,cp,readFile,writeFile} from 'node:fs/promises';
+await mkdir('dist',{recursive:true});
+let html=await readFile('index.html','utf8');
+html=html.replace('<script type="module" src="/src/main.js"></script>','<script type="module" src="/main.js"></script>');
+html=html.replace('</head>','<link rel="stylesheet" href="/style.css"/></head>');
+await writeFile('dist/index.html',html);
+let js=await readFile('src/main.js','utf8');
+js=js.replace(/^import '\.\/style\.css';\s*/,'');
+await writeFile('dist/main.js',js);
+await cp('src/style.css','dist/style.css');
+await cp('src/logo-oasi.png','dist/logo-oasi.png');
+console.log('Sito compilato in dist/');
