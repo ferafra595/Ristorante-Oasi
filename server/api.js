@@ -30,32 +30,27 @@ const hours=cfg[svc]||{};if(!admin){if(!hours.enabled||minutes(tm)<minutes(hours
 async function saveBooking(ctx,b,admin=false){const db=ctx.env.DB;const {d,tm,svc,party,ids}=await validateBooking(db,b,admin);const name=clean(b.name,120),phone=clean(b.phone,40),mail=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600);if(!name||!phone||(!admin&&!/^\S+@\S+\.\S+$/.test(mail)))throw Error('Inserisci nome, telefono e indirizzo email valido');const usable=(admin&&b.room_id)?[Number(b.room_id)]:ids;let opts=await candidates(db,usable,d,svc,party);if(admin&&b.table_ids?.length){const requested=b.table_ids.map(Number);const match=opts.find(o=>o.ids.length===requested.length&&o.ids.every(id=>requested.includes(id)));if(!match)throw Error('Tavoli selezionati non disponibili o non compatibili');else opts=[match,...opts.filter(o=>o!==match)]}
 if(!opts.length)throw Error('Nessun tavolo disponibile per questo numero di persone');const token=rand(),hashed=await digest(token);let lastError;for(const o of opts){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert]);const id=seq[0].meta.last_row_id;try{await db.batch(o.ids.map(tid=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,tid,d,svc)))}catch(e){await db.prepare('DELETE FROM reservations WHERE id=?').bind(id).run();throw e}const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;ctx.waitUntil(email(ctx.env,mail,'Prenotazione confermata · Ristorante Oasi',`<h2>Prenotazione confermata</h2><p>Grazie ${esc(name)}. Ti aspettiamo il ${esc(d)} alle ${esc(tm)} (${party} persone).</p><p>Per annullare: <a href="${esc(cancellation)}">Annulla prenotazione</a></p>`));return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)}}catch(e){lastError=e;if(!String(e).includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
 async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
- const loginEmail=clean(b.email,180).toLowerCase(),loginPass=String(b.password||'');
- const configuredEmail=clean(ctx.env.ADMIN_EMAIL,180).toLowerCase();
+ // Accesso unico: l'utente inserisce solo la password impostata come Secret su Cloudflare.
  const configuredPass=ctx.env.ADMIN_PASSWORD;
- const cloudflareMode=Boolean(configuredEmail||configuredPass);
- let row;
- if(cloudflareMode){
-  if(!configuredEmail||typeof configuredPass!=='string'||configuredPass.length===0)return fail('Configurazione ADMIN incompleta: imposta ADMIN_EMAIL e ADMIN_PASSWORD su Cloudflare',503);
-  if(loginEmail!==configuredEmail||!(await equalSecret(loginPass,configuredPass)))return fail('Credenziali non valide',401);
-  // L'utente viene creato in D1 automaticamente; l'account serve alle sessioni esistenti.
-  row=await db.prepare('SELECT * FROM users WHERE email=?').bind(configuredEmail).first();
-  const hashed=await passwordHash(configuredPass);
-  if(!row){
-   await db.prepare('INSERT INTO users(email,password_hash) VALUES(?,?)').bind(configuredEmail,hashed).run();
-   row=await db.prepare('SELECT * FROM users WHERE email=?').bind(configuredEmail).first();
-  }else if(!(await verifyPassword(configuredPass,row.password_hash))){
-   await db.batch([db.prepare('DELETE FROM sessions WHERE user_id=?').bind(row.id),db.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(hashed,row.id)]);
-  }
+ if(typeof configuredPass!=='string'||configuredPass.length===0)return fail('Configurazione ADMIN incompleta: aggiungi ADMIN_PASSWORD come Secret di produzione su Cloudflare',503);
+ const supplied=String(b.password||'');
+ if(!supplied||!(await equalSecret(supplied,configuredPass)))return fail('Password non valida',401);
+ const internalEmail='oasi-admin@internal.invalid'; // solo identificatore tecnico D1, non email di accesso
+ const hashed=await passwordHash(configuredPass);
+ await db.prepare('INSERT OR IGNORE INTO users(email,password_hash) VALUES(?,?)').bind(internalEmail,hashed).run();
+ const row=await db.prepare('SELECT * FROM users WHERE email=?').bind(internalEmail).first();
+ if(!(await verifyPassword(configuredPass,row.password_hash))){
+  await db.batch([db.prepare('DELETE FROM sessions'),db.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(hashed,row.id)]);
  }else{
-  row=await db.prepare('SELECT * FROM users WHERE email=?').bind(loginEmail).first();
-  if(!row||!(await verifyPassword(loginPass,row.password_hash)))return fail('Credenziali non valide',401);
+  // La nuova modalità impedisce l'utilizzo delle sessioni create per vecchi account email.
+  await db.prepare('DELETE FROM sessions WHERE user_id<>?').bind(row.id).run();
  }
  const token=rand(),exp=new Date(Date.now()+7*86400000).toISOString();
  await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),row.id,exp).run();
- return json({ok:true,email:row.email},200,{'set-cookie':cookie(token,new URL(ctx.request.url).protocol==='https:')});
+ return json({ok:true},200,{'set-cookie':cookie(token,new URL(ctx.request.url).protocol==='https:')});
 }
-const user=await currentUser(db,ctx.request);if(!user)return fail('Accesso richiesto',401);
+const user=await currentUser(db,ctx.request);
+if(!user||user.email!=='oasi-admin@internal.invalid')return fail('Accesso richiesto',401);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
 if(resource==='dashboard'){const date=clean(new URL(ctx.request.url).searchParams.get('date')||today());const bookings=await db.prepare("SELECT service,COUNT(*) bookings,COALESCE(SUM(party_size),0) guests FROM reservations WHERE book_date=? AND status='confirmed' GROUP BY service").bind(date).all();const month=await db.prepare("SELECT substr(book_date,1,7) month,COUNT(*) bookings,COALESCE(SUM(party_size),0) guests FROM reservations WHERE status='confirmed' GROUP BY substr(book_date,1,7) ORDER BY month DESC LIMIT 12").all();return json({bookings:bookings.results,months:month.results})}
@@ -67,7 +62,7 @@ if(['menu','gallery'].includes(resource)){const table=resource==='menu'?'menu_it
 if(resource==='upload'&&method==='POST'){if(!ctx.env.MEDIA)return fail('Bucket R2 non configurato',503);const form=await ctx.request.formData(),file=form.get('file');if(!file||typeof file==='string'||!file.type.startsWith('image/')||file.size>7*1024*1024)return fail('Carica un’immagine valida fino a 7MB');const ext=({ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'})[file.type];if(!ext)return fail('Formato non supportato');const key=rand()+'.'+ext;await ctx.env.MEDIA.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type}});return json({url:'/api/media/'+key})}
 return fail('Rotta non trovata',404)}
 export async function onRequest(ctx){try{if(!ctx.env.DB)return fail('Database D1 non configurato',503);const url=new URL(ctx.request.url),parts=url.pathname.replace(/^\/api\/?/,'').split('/').filter(Boolean),method=ctx.request.method,db=ctx.env.DB;if(parts[0]==='media'&&method==='GET'){if(!ctx.env.MEDIA)return fail('Bucket non configurato',503);const obj=await ctx.env.MEDIA.get(parts[1]);if(!obj)return fail('Immagine non trovata',404);return new Response(obj.body,{headers:{'content-type':obj.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=86400'}})}
-if(parts[0]==='setup'&&method==='POST'){const b=await read(ctx.request);if(!ctx.env.SETUP_KEY||b.setup_key!==ctx.env.SETUP_KEY)return fail('Chiave installazione errata',403);const count=await db.prepare('SELECT COUNT(*) n FROM users').first();if(count.n)return fail('Amministratore già configurato',409);if(!String(b.password||''))return fail('Inserisci una password');if(!/^\S+@\S+\.\S+$/.test(b.email||''))return fail('Email non valida');await db.prepare('INSERT INTO users(email,password_hash) VALUES(?,?)').bind(clean(b.email,180).toLowerCase(),await passwordHash(b.password)).run();return json({ok:true})}
+if(parts[0]==='setup')return fail('Configurazione iniziale disabilitata: usa ADMIN_PASSWORD',404);
 if(parts[0]==='admin')return adminRoute(ctx,parts,method);
 if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=await Promise.all([config(db,'site'),config(db,'booking'),db.prepare('SELECT id,name,public_enabled FROM rooms ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM menu_items WHERE available=1 ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM gallery ORDER BY sort_order,id').all()]);return json({site,booking,rooms:rooms.results,menu:menu.results,gallery:gallery.results,email_enabled:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)})}
 if(parts[0]==='availability'&&method==='GET'){const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await candidates(db,state.ids,state.d,state.svc,state.party);return json({available:options.length>0,rooms:(await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1').all()).results.filter(r=>options.some(o=>o.room_id===r.id))})}
