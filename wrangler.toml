@@ -34,8 +34,6 @@ migrations_dir = "migrations"
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "oasi-media"
-# ...
 [vars]
 ADMIN_EMAIL = "Ferafra595@gmail.com"
 PUBLIC_URL = "http://localhost:8787"
-# ...
