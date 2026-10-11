@@ -2,7 +2,7 @@ import './style.css';
 const $=s=>document.querySelector(s),root=$('#app');
 const state={data:null,user:null,adminView:'dashboard',date:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'}),room:1,reservations:[],rooms:[],tables:[],menu:[],gallery:[],settings:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const api=async(path,method='GET',data)=>{const r=await fetch('/api/'+path,{method,headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,credentials:'same-origin'});let o;try{o=await r.json()}catch{o={error:'Risposta non valida del server'}}if(!r.ok)throw Error(o.error||'Errore '+r.status);return o};
+const api=async(path,method='GET',data)=>{let r;try{r=await fetch('/api/'+path,{method,headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,credentials:'same-origin',cache:'no-store'})}catch{throw Error('Impossibile contattare il server. Riprova tra poco.')}const type=r.headers.get('content-type')||'';const raw=await r.text();let o=null;try{o=JSON.parse(raw)}catch{}if(!o||typeof o!=='object'){console.error('API non JSON',{path,status:r.status,contentType:type,response:raw.slice(0,300)});throw Error('La richiesta API non arriva correttamente al backend (HTTP '+r.status+'). Verifica il deploy del Worker e i binding DB.')}if(!r.ok)throw Error(o.error||'Errore HTTP '+r.status);return o};
 const msg=(t,type='ok')=>{const n=document.createElement('div');n.className='toast '+type;n.textContent=t;document.body.append(n);setTimeout(()=>n.remove(),5500)};
 const icon=(name)=>({calendar:'◷',menu:'☰',close:'×'}[name]||'•');
 const site=()=>state.data?.site||{};
