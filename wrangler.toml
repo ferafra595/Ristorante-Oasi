@@ -16,7 +16,8 @@ migrations_dir = "migrations"
 binding = "MEDIA"
 bucket_name = "oasi-media"
 [vars]
-PUBLIC_URL = "http://localhost:8787"
+PUBLIC_URL = "[vars]
+PUBLIC_URL = "https://ristorante-oasi.ferafra595.workers.dev""
 name = "ristorante-oasi"
 main = "server/index.js"
 compatibility_date = "2025-06-01"
