@@ -177,3 +177,6 @@ a:hover .oasi-arrow{transform:translate(2px,-3px)}
 .faq-admin-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.faq-admin-row{border:1px solid #e8dfd4;border-radius:20px;background:#faf8f5;padding:18px;margin:14px 0;display:grid;gap:10px}.faq-admin-row label{display:grid;gap:6px}.faq-admin-row input,.faq-admin-row textarea{width:100%;padding:12px;border:1px solid #ded4c7;border-radius:10px;font:inherit}.faq-admin-row .faq-remove{justify-self:start}
 @media(max-width:900px){.oasi-reviews,.oasi-faq{grid-template-columns:1fr}.oasi-reviews{padding-top:75px;padding-bottom:75px}.oasi-faq{padding:65px 25px;border-radius:28px}.oasi-reviews-visual{min-height:290px}}@media(max-width:560px){.oasi-reviews-visual{padding:30px;border-radius:25px}.oasi-faq-item summary{font-size:16px;padding:21px 2px}.oasi-faq{margin-bottom:50px}.reviews-actions{align-items:stretch;flex-direction:column}.reviews-actions .btn{justify-content:center}}
 @media(prefers-reduced-motion:reduce){.faq-plus,.oasi-faq-item[open] p{animation:none;transition:none}}
+
+/* Accesso amministratore a password unica */
+.login-card #login label{display:block;margin-bottom:18px}.login-card #login input[type="password"]{width:100%}
