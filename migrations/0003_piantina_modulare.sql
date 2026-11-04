@@ -1,0 +1,18 @@
+-- V3: non elimina e non modifica i tavoli o le prenotazioni esistenti.
+CREATE TABLE IF NOT EXISTS table_details (
+ table_id INTEGER PRIMARY KEY REFERENCES tables(id) ON DELETE CASCADE,
+ min_seats INTEGER NOT NULL DEFAULT 1,
+ module_count INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS table_links (
+ table_a INTEGER NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
+ table_b INTEGER NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
+ PRIMARY KEY(table_a,table_b),
+ CHECK(table_a<table_b)
+);
+CREATE TABLE IF NOT EXISTS room_zones (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+ label TEXT NOT NULL DEFAULT '',
+ x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL
+);
