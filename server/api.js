@@ -62,6 +62,16 @@ if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('c
 if(resource==='dashboard'){const date=clean(new URL(ctx.request.url).searchParams.get('date')||today());const bookings=await db.prepare("SELECT service,COUNT(*) bookings,COALESCE(SUM(party_size),0) guests FROM reservations WHERE book_date=? AND status='confirmed' GROUP BY service").bind(date).all();const month=await db.prepare("SELECT substr(book_date,1,7) month,COUNT(*) bookings,COALESCE(SUM(party_size),0) guests FROM reservations WHERE status='confirmed' GROUP BY substr(book_date,1,7) ORDER BY month DESC LIMIT 12").all();return json({bookings:bookings.results,months:month.results})}
 if(resource==='settings'){if(method==='GET')return json({site:await config(db,'site'),booking:await config(db,'booking')});if(method==='PUT'){const key=parts[2];if(!['site','booking'].includes(key))return fail('Impostazione non valida');await db.prepare('UPDATE settings SET value=? WHERE key=?').bind(JSON.stringify(b),key).run();return json({ok:true})}}
 if(resource==='floor-elements'){
+ // Schema idempotente: evita errori 500 quando la migrazione 0002 non e' stata eseguita.
+ await db.prepare(`CREATE TABLE IF NOT EXISTS floor_elements (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL CHECK(kind IN ('wall','column','door','window','label')),
+ label TEXT NOT NULL DEFAULT '',
+ x REAL NOT NULL DEFAULT 0, y REAL NOT NULL DEFAULT 0,
+ w REAL NOT NULL DEFAULT 80, h REAL NOT NULL DEFAULT 20, rotation REAL NOT NULL DEFAULT 0
+ )`).run();
+
  const allowed=['wall','column','door','window','label'];
  if(method==='GET')return json((await db.prepare('SELECT * FROM floor_elements ORDER BY room_id,id').all()).results);
  if(method==='POST'||method==='PUT'){
@@ -91,4 +101,4 @@ if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=
 if(parts[0]==='availability'&&method==='GET'){const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await candidates(db,state.ids,state.d,state.svc,state.party);return json({available:options.length>0,rooms:(await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1').all()).results.filter(r=>options.some(o=>o.room_id===r.id))})}
 if(parts[0]==='book'&&method==='POST')return json(await saveBooking(ctx,await read(ctx.request),false),201);
 if(parts[0]==='cancel'&&method==='POST'){const b=await read(ctx.request);if(!/^[a-f0-9]{64}$/.test(b.token||''))return fail('Link non valido');const hashed=await digest(b.token),r=await db.prepare('SELECT id,status FROM reservations WHERE cancel_token_hash=?').bind(hashed).first();if(!r)return fail('Prenotazione non trovata',404);if(r.status==='cancelled')return json({ok:true,already:true});await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(r.id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(r.id)]);return json({ok:true})}
-return fail('Rotta non trovata',404)}catch(e){console.error(e);return fail(e.message||'Errore interno',/UNIQUE constraint/.test(e.message||'')?409:400)}}
+return fail('Rotta non trovata',404)}catch(e){console.error(e);return fail(/UNIQUE constraint/.test(e.message||'')?'Elemento già presente': 'Errore server. Controlla i registri Cloudflare.', /UNIQUE constraint/.test(e.message||'')?409:500)}}
