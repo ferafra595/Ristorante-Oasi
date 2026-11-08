@@ -1,3 +1,4 @@
+import {ensurePhase2,syncCustomer,alertStaff,emailForBooking,emailStaff,sendEmailRecorded,validEmail} from './phase2.js';
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}});
 const fail=(message,status=400)=>json({error:message},status);
 const now=()=>new Date().toISOString();
@@ -22,7 +23,7 @@ const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5));
 const cookie=(token,secure)=>`oasi_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure?'; Secure':''}`;
 async function currentUser(db,req){const token=(req.headers.get('cookie')||'').match(/(?:^|; )oasi_session=([a-f0-9]{64})/)?.[1];if(!token)return null;return db.prepare('SELECT users.id,users.email FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.token_hash=? AND sessions.expires_at>?').bind(await digest(token),now()).first()}
 const clean=(s,n=1000)=>String(s??'').trim().slice(0,n);
-async function email(env,to,subject,html){if(!env.RESEND_API_KEY||!env.EMAIL_FROM)return;try{await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:env.EMAIL_FROM,to:[to],subject,html})})}catch(e){console.error('Email error',e)}}
+
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function ensureFloorV3(db){
  await db.prepare(`CREATE TABLE IF NOT EXISTS table_details (table_id INTEGER PRIMARY KEY REFERENCES tables(id) ON DELETE CASCADE,min_seats INTEGER NOT NULL DEFAULT 1,module_count INTEGER NOT NULL DEFAULT 1)`).run();
@@ -119,14 +120,20 @@ async function manualTableCandidate(db,roomIds,date,service,party,selected){
 }
 async function validateBooking(db,b,admin=false){const cfg=await config(db,'booking');const d=clean(b.date,10),tm=clean(b.time,5),svc=clean(b.service,10);if(!dateOk(d)||!timeOk(tm)||!['lunch','dinner'].includes(svc))throw Error('Data, servizio o orario non validi');if(!admin){if(d<today())throw Error('La data selezionata è passata');const max=new Date();max.setDate(max.getDate()+(Number(cfg.maxDaysAhead)||90));if(d>max.toLocaleDateString('en-CA',{timeZone:'Europe/Rome'}))throw Error('Data troppo lontana');if(!cfg.weekdays.includes(weekday(d))||cfg.closedDates?.includes(d))throw Error('Ristorante chiuso nella data selezionata')}
 const hours=cfg[svc]||{};if(!admin){if(!hours.enabled||minutes(tm)<minutes(hours.start||'00:00')||minutes(tm)>minutes(hours.last||hours.end||'23:59'))throw Error('Orario non prenotabile');const italyNow=new Date(Date.now()+(Number(cfg.minNoticeMinutes)||0)*60000).toLocaleString('sv-SE',{timeZone:'Europe/Rome'}).replace(' ','T');if(d===today()&&(d+'T'+tm)<italyNow)throw Error('Prenotazione troppo vicina all’orario attuale')}const party=Number(b.party_size);if(!Number.isInteger(party)||party<1||party>(admin?200:Number(cfg.maxOnline||9)))throw Error(admin?'Numero persone non valido':'Per gruppi da 10 persone chiamaci direttamente');const rooms=await db.prepare(`SELECT id FROM rooms WHERE ${admin?'internal_enabled=1':'public_enabled=1'} ORDER BY sort_order,id`).all();const ids=rooms.results.map(r=>r.id).filter(id=>admin||!cfg.disabledDatesByRoom?.[String(id)]?.includes(d));return {cfg,d,tm,svc,party,ids}}
-async function saveBooking(ctx,b,admin=false){const db=ctx.env.DB;const {d,tm,svc,party,ids}=await validateBooking(db,b,admin);const name=clean(b.name,120),phone=clean(b.phone,40),mail=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600);if(!name||!phone||(!admin&&!/^\S+@\S+\.\S+$/.test(mail)))throw Error('Inserisci nome, telefono e indirizzo email valido');const usable=(admin&&b.room_id)?[Number(b.room_id)]:ids;let opts;
+async function saveBooking(ctx,b,admin=false){const db=ctx.env.DB;const {d,tm,svc,party,ids}=await validateBooking(db,b,admin);const name=clean(b.name,120),phone=clean(b.phone,40),mail=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600);if(!name||!phone||!validEmail(mail))throw Error('Nome, telefono ed email valida sono obbligatori');const usable=(admin&&b.room_id)?[Number(b.room_id)]:ids;let opts;
 if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length){
  const requested=b.table_ids.map(Number);
  const explicit=await manualTableCandidate(db,usable,d,svc,party,requested);
  if(!explicit)throw Error('Uno o più tavoli sono occupati, bloccati, in altra sala o non adatti alla capienza richiesta.');
  opts=[explicit]; // Never silently assign different tables when staff requested exact IDs.
 }else{opts=await candidates(db,usable,d,svc,party)}
-if(!opts.length)throw Error('Nessun tavolo disponibile per questo numero di persone');const token=rand(),hashed=await digest(token);let lastError;for(const o of opts){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert]);const id=seq[0].meta.last_row_id;try{await db.batch(o.ids.map(tid=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,tid,d,svc)))}catch(e){await db.prepare('DELETE FROM reservations WHERE id=?').bind(id).run();throw e}const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;if(mail)ctx.waitUntil(email(ctx.env,mail,'Prenotazione confermata · Ristorante Oasi',`<h2>Prenotazione confermata</h2><p>Grazie ${esc(name)}. Ti aspettiamo il ${esc(d)} alle ${esc(tm)} (${party} persone).</p><p>Per annullare: <a href="${esc(cancellation)}">Annulla prenotazione</a></p>`));return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)}}catch(e){lastError=e;if(!String(e).includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
+if(!opts.length)throw Error('Nessun tavolo disponibile per questo numero di persone');const token=rand(),hashed=await digest(token);let lastError;for(const o of opts){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert]);const id=seq[0].meta.last_row_id;try{await db.batch(o.ids.map(tid=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,tid,d,svc)))}catch(e){await db.prepare('DELETE FROM reservations WHERE id=?').bind(id).run();throw e}const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;
+const booking={id,book_date:d,service:svc,time:tm,party_size:party,name,phone,email:mail,source:admin?'staff':'web'};
+let mailResult={status:'unconfigured'};
+try{await syncCustomer(db,booking);await alertStaff(db,id,'new','Nuova prenotazione #'+id,`${d} ${svc==='lunch'?'Pranzo':'Cena'} · ${tm} · ${name} · ${party} persone`)}catch(e){console.error('Oasi fase2 post-book',e)}
+try{mailResult=await emailForBooking(ctx,booking,'confirm',cancellation);await emailStaff(ctx,booking,'new')}catch(e){console.error('Oasi email confirm',e)}
+return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_status:mailResult.status,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)};
+}catch(e){lastError=e;if(!String(e).includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
 async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
  // Accesso unico: l'utente inserisce solo la password impostata come Secret su Cloudflare.
  const configuredPass=ctx.env.ADMIN_PASSWORD;
@@ -157,6 +164,43 @@ const user=await currentUser(db,ctx.request);
 if(!user||user.email!=='oasi-admin@internal.invalid')return fail('Accesso richiesto',401);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
+if(resource==='customers'){
+ await ensurePhase2(db);
+ if(method==='GET'){
+  const q=clean(new URL(ctx.request.url).searchParams.get('q')||'',100);
+  const results=await db.prepare(`SELECT c.*,COUNT(r.id) total_bookings,SUM(CASE WHEN r.status='confirmed' THEN 1 ELSE 0 END) active_bookings,MAX(r.book_date) last_booking FROM oasi_customers c LEFT JOIN reservations r ON lower(r.email)=lower(c.email) WHERE (?='' OR c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?) GROUP BY c.id ORDER BY COALESCE(last_booking,'') DESC,c.name LIMIT 250`).bind(q,'%'+q+'%','%'+q+'%','%'+q+'%').all();
+  return json(results.results||[])
+ }
+ if(method==='PATCH'){
+  const id=Number(parts[2]);if(!Number.isInteger(id)||id<1)return fail('Cliente non valido');
+  const row=await db.prepare('SELECT * FROM oasi_customers WHERE id=?').bind(id).first();if(!row)return fail('Cliente non trovato',404);
+  const name=clean(b.name,120),phone=clean(b.phone,40),staff_note=clean(b.staff_note,500);
+  if(!name||!phone)return fail('Nome e telefono obbligatori');
+  await db.prepare('UPDATE oasi_customers SET name=?,phone=?,staff_note=?,updated_at=? WHERE id=?').bind(name,phone,staff_note,now(),id).run();return json({ok:true})
+ }
+ if(method==='DELETE'){
+  const id=Number(parts[2]);await db.prepare('DELETE FROM oasi_customers WHERE id=?').bind(id).run();return json({ok:true,note:'Le prenotazioni restano conservate secondo le regole di gestione.'})
+ }
+ return fail('Metodo non consentito',405)
+}
+if(resource==='customer-history'&&method==='GET'){
+ await ensurePhase2(db);const id=Number(parts[2]),customer=await db.prepare('SELECT * FROM oasi_customers WHERE id=?').bind(id).first();
+ if(!customer)return fail('Cliente non trovato',404);
+ const result=await db.prepare(`SELECT r.id,r.book_date,r.service,r.time,r.party_size,r.status,r.source,COALESCE(v.state,'expected') visit_state,GROUP_CONCAT(t.code,', ') table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE lower(r.email)=lower(?) GROUP BY r.id ORDER BY r.book_date DESC,r.time DESC LIMIT 120`).bind(customer.email).all();
+ return json({customer,bookings:result.results||[]})
+}
+if(resource==='notifications'){
+ await ensurePhase2(db);
+ if(method==='GET')return json((await db.prepare('SELECT * FROM oasi_staff_notifications ORDER BY created_at DESC,id DESC LIMIT 100').all()).results||[]);
+ if(method==='PATCH'){const id=Number(parts[2]);if(!Number.isInteger(id)||id<1)return fail('ID non valido');await db.prepare('UPDATE oasi_staff_notifications SET seen=1 WHERE id=?').bind(id).run();return json({ok:true})}
+ if(method==='POST'&&parts[2]==='mark-all'){await db.prepare('UPDATE oasi_staff_notifications SET seen=1 WHERE seen=0').run();return json({ok:true})}
+ return fail('Metodo non consentito',405)
+}
+if(resource==='email-log'){
+ await ensurePhase2(db);
+ if(method==='GET')return json({configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM),sender:ctx.env.EMAIL_FROM||'',items:(await db.prepare('SELECT id,reservation_id,recipient,email_type,subject,status,error,created_at,attempted_at FROM oasi_email_log ORDER BY id DESC LIMIT 100').all()).results||[]});
+ return fail('Metodo non consentito',405)
+}
 if(resource==='operations'){
  if(method!=='GET')return fail('Metodo non valido',405);
  const query=new URL(ctx.request.url).searchParams,date=query.get('date')||today(),service=query.get('service')||'all';
@@ -288,15 +332,21 @@ if(resource==='tables'){
 if(resource==='reservations'){if(method==='GET'){await ensureOperations(db);const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,GROUP_CONCAT(t.code, ', ') table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);if(b.action==='edit_details'){
  if(old.status!=='confirmed')return fail('Prenotazione annullata: impossibile modificare',409);
  const name=clean(b.name,120),phone=clean(b.phone,40),email=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600),time=clean(b.time,5),party=Number(b.party_size);
- if(!name||!phone||!timeOk(time)||!Number.isInteger(party)||party<1||party>200)return fail('Dati prenotazione non validi',400);
+ if(!name||!phone||!validEmail(email)||!timeOk(time)||!Number.isInteger(party)||party<1||party>200)return fail('Inserisci nome, telefono ed email valida, oltre ai dati della prenotazione',400);
  await ensureFloorV3(db);
  const assigned=(await db.prepare('SELECT t.id,t.seats,COALESCE(d.min_seats,1) min_seats FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id LEFT JOIN table_details d ON d.table_id=t.id WHERE rt.reservation_id=?').bind(id).all()).results||[];
  if(!assigned.length)return fail('La prenotazione non ha tavoli assegnati',409);
  const minimum=assigned.reduce((n,t)=>n+Number(t.min_seats||1),0),maximum=assigned.reduce((n,t)=>n+Number(t.seats||0),0);
  if(party<minimum||party>maximum)return fail(`Il tavolo assegnato accetta da ${minimum} a ${maximum} persone`,409);
  await db.prepare('UPDATE reservations SET name=?,phone=?,email=?,notes=?,time=?,party_size=? WHERE id=?').bind(name,phone,email,notes,time,party,id).run();
- return json({ok:true,id});
-} if(b.status==='cancelled'){await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id)]);return json({ok:true})}const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];if(!tableIds.length)return fail('Indica i tavoli da assegnare');const existing=(await db.prepare('SELECT id,room_id,seats FROM tables WHERE id IN ('+tableIds.map(()=>'?').join(',')+')').bind(...tableIds).all()).results;if(existing.length!==tableIds.length||existing.some(t=>t.room_id!==existing[0].room_id)||existing.reduce((n,t)=>n+t.seats,0)<old.party_size)return fail('Tavoli incompatibili');try{await db.batch([db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),...tableIds.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,old.book_date,old.service)),db.prepare("UPDATE reservations SET room_id=?,status='confirmed' WHERE id=?").bind(existing[0].room_id,id)]);return json({ok:true})}catch(e){return fail('Tavoli già occupati: '+e.message)}}}
+ const changed={...old,name,phone,email,notes,time,party_size:party};let status='unconfigured';
+ try{await syncCustomer(db,changed);await alertStaff(db,id,'edit','Prenotazione modificata #'+id,`${old.book_date} · ${name}`);if(old.email!==email||old.time!==time||Number(old.party_size)!==party){const result=await emailForBooking(ctx,changed,'change','',`change:${id}:${Date.now()}`);status=result.status}}catch(e){console.error('Oasi fase2 edit',e)}
+ return json({ok:true,id,email_status:status});
+} if(b.status==='cancelled'){
+ if(old.status==='cancelled')return json({ok:true,already:true});
+ await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id)]);
+ let mailStatus='unconfigured';try{await alertStaff(db,id,'cancel','Prenotazione annullata #'+id,`${old.book_date} · ${old.name}`);mailStatus=(await emailForBooking(ctx,old,'cancel')).status;await emailStaff(ctx,old,'cancel')}catch(e){console.error('Oasi cancel',e)}return json({ok:true,email_status:mailStatus});
+}const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];if(!tableIds.length)return fail('Indica i tavoli da assegnare');const existing=(await db.prepare('SELECT id,room_id,seats FROM tables WHERE id IN ('+tableIds.map(()=>'?').join(',')+')').bind(...tableIds).all()).results;if(existing.length!==tableIds.length||existing.some(t=>t.room_id!==existing[0].room_id)||existing.reduce((n,t)=>n+t.seats,0)<old.party_size)return fail('Tavoli incompatibili');try{await db.batch([db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),...tableIds.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,old.book_date,old.service)),db.prepare("UPDATE reservations SET room_id=?,status='confirmed' WHERE id=?").bind(existing[0].room_id,id)]);return json({ok:true})}catch(e){return fail('Tavoli già occupati: '+e.message)}}}
 if(['menu','gallery'].includes(resource)){const table=resource==='menu'?'menu_items':'gallery';if(method==='GET')return json((await db.prepare(`SELECT * FROM ${table} ORDER BY sort_order,id`).all()).results);if(method==='POST'||method==='PUT'){const fields=table==='menu_items'?['section','category','name','description','price','allergens','image_url','region','winery','vintage','available','sort_order']:['image_url','caption','category','sort_order'];const values=fields.map(k=>['available','sort_order'].includes(k)?Number(b[k]??(k==='available'?1:0)):clean(b[k],k==='description'?1400:600));if(method==='POST'){const r=await db.prepare(`INSERT INTO ${table}(${fields.join(',')}) VALUES(${fields.map(()=>'?').join(',')})`).bind(...values).run();return json({ok:true,id:r.meta.last_row_id})}await db.prepare(`UPDATE ${table} SET ${fields.map(f=>f+'=?').join(',')} WHERE id=?`).bind(...values,Number(parts[2])).run();return json({ok:true})}if(method==='DELETE'){await db.prepare(`DELETE FROM ${table} WHERE id=?`).bind(Number(parts[2])).run();return json({ok:true})}}
 if(resource==='upload'&&method==='POST'){if(!ctx.env.MEDIA)return fail('Bucket R2 non configurato',503);const form=await ctx.request.formData(),file=form.get('file');if(!file||typeof file==='string'||!file.type.startsWith('image/')||file.size>7*1024*1024)return fail('Carica un’immagine valida fino a 7MB');const ext=({ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'})[file.type];if(!ext)return fail('Formato non supportato');const key=rand()+'.'+ext;await ctx.env.MEDIA.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type}});return json({url:'/api/media/'+key})}
 return fail('Rotta non trovata',404)}
@@ -306,5 +356,6 @@ if(parts[0]==='admin')return adminRoute(ctx,parts,method);
 if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=await Promise.all([config(db,'site'),config(db,'booking'),db.prepare('SELECT id,name,public_enabled FROM rooms ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM menu_items WHERE available=1 ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM gallery ORDER BY sort_order,id').all()]);return json({site,booking,rooms:rooms.results,menu:menu.results,gallery:gallery.results,email_enabled:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)})}
 if(parts[0]==='availability'&&method==='GET'){const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await candidates(db,state.ids,state.d,state.svc,state.party);return json({available:options.length>0,rooms:(await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1').all()).results.filter(r=>options.some(o=>o.room_id===r.id))})}
 if(parts[0]==='book'&&method==='POST')return json(await saveBooking(ctx,await read(ctx.request),false),201);
-if(parts[0]==='cancel'&&method==='POST'){const b=await read(ctx.request);if(!/^[a-f0-9]{64}$/.test(b.token||''))return fail('Link non valido');const hashed=await digest(b.token),r=await db.prepare('SELECT id,status FROM reservations WHERE cancel_token_hash=?').bind(hashed).first();if(!r)return fail('Prenotazione non trovata',404);if(r.status==='cancelled')return json({ok:true,already:true});await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(r.id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(r.id)]);return json({ok:true})}
+if(parts[0]==='cancel'&&method==='POST'){const b=await read(ctx.request);if(!/^[a-f0-9]{64}$/.test(b.token||''))return fail('Link non valido');const hashed=await digest(b.token),r=await db.prepare('SELECT id,status FROM reservations WHERE cancel_token_hash=?').bind(hashed).first();if(!r)return fail('Prenotazione non trovata',404);if(r.status==='cancelled')return json({ok:true,already:true});await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(r.id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(r.id)]);
+ try{const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(r.id).first();await alertStaff(db,r.id,'cancel','Prenotazione annullata #'+r.id,`${old.book_date} · ${old.name}`);await emailForBooking(ctx,old,'cancel');await emailStaff(ctx,old,'cancel')}catch(e){console.error('Oasi public cancel',e)}return json({ok:true})}
 return fail('Rotta non trovata',404)}catch(e){console.error(e);return fail(/UNIQUE constraint/.test(e.message||'')?'Elemento già presente': 'Errore server. Controlla i registri Cloudflare.', /UNIQUE constraint/.test(e.message||'')?409:500)}}
