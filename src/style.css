@@ -333,3 +333,30 @@ body.floor-panel-open .admin .floor-editor-layout>.floor-inspector{
 .floor-board .floor-zone:hover{outline:none!important}
 @media(max-width:720px){.floor-canvas-panel{padding:10px!important}.floor-zoom-toolbar{gap:5px}.floor-zoom-caption{width:100%;margin-bottom:3px}.floor-zoom-toolbar .floor-zoom-fit{font-size:11px;padding:0 9px}.floor-board-scroll{border-radius:12px!important}}
 @media print{.floor-zoom-toolbar,.floor-table-resize,.floor-zone-resize{display:none!important}.floor-board-scroll{overflow:visible!important}.floor-board-stage{width:1100px!important;height:700px!important;zoom:.69}.floor-board{transform:none!important}.floor-table{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+
+/* OASI ADMIN V9 — Prenotazioni, filtri e stampa servizio */
+.reservation-control-panel{padding:28px!important;background:linear-gradient(145deg,#fffdf9,#fff)!important}
+.reservation-control-head{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.reservation-control-head h3{font:500 clamp(27px,3vw,39px) 'Cormorant Garamond',Georgia,serif;margin:8px 0 0}
+.reservation-filters{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:20px 0}
+.reservation-filters label{min-width:175px;flex:1 1 195px;max-width:300px}
+.reservation-filters .mini{min-height:45px;border-radius:12px;padding:12px 15px}
+.reservation-summary{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid #ede6dd;padding-top:19px}
+.reservation-summary>span{background:#f7f2eb;border:1px solid #eadfd1;border-radius:99px;padding:10px 15px;color:#685c4f;font-size:13px}
+.reservation-summary strong{color:#29241f;font-size:16px;margin-right:4px}
+.reservation-print-actions{display:flex;gap:11px;margin-top:22px;flex-wrap:wrap}.reservation-print-actions .btn{border-radius:99px;min-height:49px}
+.reservation-list-panel h3{font:500 32px 'Cormorant Garamond',Georgia,serif;margin:0 0 20px}.reservation-list th{font-size:12px;letter-spacing:.02em}.reservation-list td{vertical-align:middle;line-height:1.45}.reservation-list small{color:#857b70}.reservation-list a{text-decoration:underline;text-decoration-color:#c5b59e;text-underline-offset:3px}
+.reservation-status{display:inline-flex;align-items:center;border-radius:99px;padding:7px 11px;font-size:12px;font-weight:650;background:#eef3ea;color:#3e7048}.reservation-status.cancelled{background:#f9e9e8;color:#a04444}.reservation-cancelled{opacity:.65}.reservation-empty{text-align:center;padding:35px!important;color:#897e71}
+.oasi-print-sheet{display:none}
+@media(max-width:640px){.reservation-control-panel{padding:18px!important}.reservation-control-head .btn{width:100%;justify-content:center}.reservation-filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}.reservation-filters label{grid-column:1/-1;max-width:none}.reservation-filters .mini{width:100%;padding:10px 7px}.reservation-print-actions{display:grid;grid-template-columns:1fr}.reservation-print-actions .btn{justify-content:center}.reservation-summary>span{font-size:12px}}
+@media print{
+ @page{size:A4 portrait;margin:12mm}
+ body:has(.oasi-print-sheet)>*:not(.oasi-print-sheet){display:none!important}
+ body:has(.oasi-print-sheet){background:#fff!important;color:#222!important;margin:0!important}
+ .oasi-print-sheet{display:block!important;width:100%;font:12px/1.4 Arial,sans-serif;color:#24211e;background:#fff}
+ .print-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #ad906a;padding:0 0 14px;margin-bottom:20px}
+ .print-header strong{display:block;font:500 34px Georgia,serif}.print-header span{display:block;font-size:9px;letter-spacing:.17em;color:#8b755a}.print-header>div:last-child{text-align:right}.print-header p{margin:4px 0;color:#665a4a}
+ .print-service{break-before:page}.print-service:first-of-type{break-before:auto}.print-service h2{font:500 25px Georgia,serif;margin:8px 0}.print-summary{padding:8px 0 12px;color:#665e55}
+ .print-room{break-inside:avoid;margin:12px 0 18px}.print-room h3{font:600 17px Arial,sans-serif;margin:10px 0 8px}.print-room-svg{display:block;width:100%;height:auto;max-height:170mm;border:1px solid #ddd3c5}.print-room-svg text{fill:#2d261e;font-family:Arial,sans-serif}
+ .print-bookings{border-collapse:collapse;width:100%;margin:16px 0;white-space:normal;font-size:10px;break-inside:auto}.print-bookings th{background:#eee7dd}.print-bookings th,.print-bookings td{border:1px solid #d6cdc1;padding:7px;text-align:left}.print-bookings tr{break-inside:avoid}
+}
