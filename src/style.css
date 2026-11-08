@@ -417,3 +417,18 @@ body.op-drawer-open{overflow:hidden}
 .phase2-email-state{display:inline-block;padding:7px 11px;border-radius:30px;background:#f0e8de;color:#83613a;font-weight:600;font-size:12px}.phase2-email-state.sent{background:#e0ecdf;color:#3b6741}.phase2-email-state.failed{background:#f5dfdb;color:#a34f49}.phase2-email-state.unconfigured{background:#f3ece0;color:#886b45}
 .phase2-drawer-wrap{position:fixed;inset:0;z-index:2200}.phase2-drawer-scrim{position:absolute;inset:0;border:0;background:rgba(24,23,22,.5);width:100%;cursor:pointer}.phase2-drawer{position:absolute;right:0;top:0;bottom:0;width:min(520px,100%);background:#fbf9f5;padding:30px;overflow:auto;box-shadow:-18px 0 70px #25211d28}.phase2-drawer h2{font:500 42px 'Cormorant Garamond',Georgia,serif;margin:14px 0 8px}.phase2-drawer form{display:grid;gap:15px;margin:24px 0}.phase2-drawer label{display:grid;gap:7px;font-weight:600;font-size:13px}.phase2-drawer input,.phase2-drawer textarea{width:100%;border:1px solid #ddd1c3;border-radius:13px;background:white;padding:13px;font:inherit}.phase2-history{display:grid;gap:9px}.phase2-history>div{background:#fff;border:1px solid #e6dbce;border-radius:15px;padding:12px 14px;display:grid;gap:5px}.phase2-history span{font-size:12px;color:#746b62}
 @media(max-width:650px){.customer-search form{display:grid}.customer-search form .btn,.customer-search form .mini{width:100%}.phase2-drawer{padding:22px 16px}.phase2-drawer h2{font-size:36px}.phase2-notice{align-items:start;flex-direction:column}}
+
+/* OASI FASE 2+ · anagrafica, comunicazioni, suggerimenti */
+.oasi-notification-count{display:inline-flex;min-width:24px;height:24px;align-items:center;justify-content:center;padding:0 6px;margin-left:9px;border-radius:18px;background:#a33d35;color:#fff;font-size:11px;font-weight:700;vertical-align:middle}
+.customer-card-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0}
+.customer-card-stats span{display:grid;gap:2px;background:#fff;border:1px solid #e5dbd0;border-radius:13px;padding:12px;font-size:12px;color:#6c6259}
+.customer-card-stats strong{display:block;color:#2f2924;font-size:22px}
+.customer-last-visit{margin:12px 0}
+.customer-contact-links{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.customer-wa{display:inline-flex!important;align-items:center;justify-content:center;gap:4px;text-decoration:none!important;color:#195d38!important;border-color:#a7cdb9!important;background:#edf8f1!important}
+.customer-autocomplete{margin:4px 0 12px;display:grid;gap:6px}
+.customer-autocomplete:empty{display:none}
+.customer-autocomplete p{font-size:12px;color:#73634f;font-weight:600;margin:0}
+.customer-suggestion{font:inherit;font-size:12px;text-align:left;line-height:1.45;padding:11px 12px;color:#342e28;background:#f6eee1;border:1px solid #ddcdbb;border-radius:10px;cursor:pointer;white-space:normal}
+.customer-suggestion:hover,.customer-suggestion:focus-visible{background:#eadac4;outline:2px solid #a98b68}
+.phase2-notice [data-notice-open]{margin-top:9px}
