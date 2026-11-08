@@ -202,33 +202,127 @@ function zoneEditor(record={}){
 function editEntity(type,record={}){if(type==='tables')return tableEditor(record);const form=type==='rooms'?[['name','Nome sala'],['sort_order','Ordine','number'],['public_enabled','Prenotabile online','checkbox'],['internal_enabled','Gestione interna attiva','checkbox']]:type==='menu'?menuFields:galleryFields;const zone=type==='tables'?$('#table-properties'):$('#edit-area');zone.innerHTML=sectionForm(record.id?'Modifica':'Nuovo elemento',fields(form,record),record.id?'Salva modifiche':'Crea');if(type==='gallery'||type==='menu'){zone.querySelector('#editor-form').insertAdjacentHTML('afterbegin','<div class="upload"><label>Carica fotografia da dispositivo<input type="file" id="upload-file" accept="image/png,image/jpeg,image/webp,image/avif" /></label><button type="button" class="mini" id="upload-action">Carica</button><span id="upload-status"></span></div>');$('#upload-action').onclick=async()=>{const file=$('#upload-file').files[0];if(!file)return msg('Scegli una foto','error');const f=new FormData();f.append('file',file);try{const r=await fetch('/api/admin/upload',{method:'POST',body:f});const o=await r.json();if(!r.ok)throw Error(o.error);zone.querySelector('[name="image_url"]').value=o.url;$('#upload-status').textContent='Foto caricata'}catch(e){msg(e.message,'error')}}}
 zone.querySelector('#form-cancel').onclick=()=>{zone.innerHTML=''};zone.querySelector('#editor-form').onsubmit=async e=>{e.preventDefault();const b=parseForm(e.target);if(type==='tables'){b.room_id=state.room;b.x=Number(b.x??record.x??55);b.y=Number(b.y??record.y??55)}try{await api('admin/'+type+(record.id?'/'+record.id:''),record.id?'PUT':'POST',b);msg('Salvato correttamente');renderAdmin()}catch(e){msg(e.message,'error')}}}
 async function deleteEntity(type,id){if(!confirm('Vuoi davvero eliminare questo elemento?'))return;try{await api('admin/'+type+'/'+id,'DELETE');msg('Elemento eliminato');renderAdmin()}catch(e){msg(e.message,'error')}}
+// Stampa indipendente dal layout ADMIN: una pagina per sala e servizio.
+// Le aree sovrapposte vengono fuse con un solo perimetro, senza bordi interni.
 function printOasiReservations(mode='plan'){
- const date=state.date, service=state.reservationService||'all';
- const rows=(state.reservations||[]).filter(r=>r.status==='confirmed');
- const serviceName=v=>v==='lunch'?'Pranzo':'Cena';
- const dayLabel=date.split('-').reverse().join('/');
- const safe=esc;
- const pageTitle=`RISTORANTE OASI · ${dayLabel} · ${service==='all'?'Pranzo e cena':serviceName(service)}`;
- const mount=document.createElement('div');mount.className='oasi-print-sheet';
- const tableBlock=(items)=>`<table class="print-bookings"><thead><tr><th>Orario</th><th>Cliente</th><th>Persone</th><th>Tavolo</th><th>Telefono</th></tr></thead><tbody>${items.length?items.map(r=>`<tr><td>${safe(r.time)}</td><td>${safe(r.name)}</td><td>${Number(r.party_size||0)}</td><td>${safe(r.table_codes||'Da assegnare')}</td><td>${safe(r.phone)}</td></tr>`).join(''):'<tr><td colspan="5">Nessuna prenotazione confermata</td></tr>'}</tbody></table>`;
- const header=`<header class="print-header"><div><strong>L’OASI</strong><span>F.LLI FERA · DAL 1997</span></div><div><b>${safe(dayLabel)}</b><p>${service==='all'?'Pranzo e cena':serviceName(service)}</p></div></header>`;
- const renderService=async(svc)=>{
-  const items=rows.filter(r=>r.service===svc);
-  const [rooms,tables,zones,structures]=await Promise.all([api('admin/rooms'),api('admin/tables'),api('admin/room-zones'),api('admin/floor-elements')]);
-  const roomIds=[...new Set(items.map(r=>Number(r.room_id)).filter(Boolean))];
-  const relevantRooms=rooms.filter(r=>roomIds.includes(Number(r.id)));
-  const roomPrint=relevantRooms.map(room=>{
-   const roomTables=tables.filter(t=>Number(t.room_id)===Number(room.id));const roomZones=zones.filter(z=>Number(z.room_id)===Number(room.id));
-   const assignments=new Map();for(const booking of items.filter(r=>Number(r.room_id)===Number(room.id))){for(const id of String(booking.table_ids||'').split(',').map(Number)){if(id>0)assignments.set(id,booking)}}
-   const shapes=roomZones.map(z=>`<rect x="${Number(z.x)}" y="${Number(z.y)}" width="${Number(z.w)}" height="${Number(z.h)}" fill="#f4ebdf" stroke="#c6b092" stroke-width="2"/>`).join('');
-   const obstacles=structures.filter(f=>Number(f.room_id)===Number(room.id)).map(f=>`<rect x="${Number(f.x)}" y="${Number(f.y)}" width="${Number(f.w)}" height="${Number(f.h)}" rx="3" fill="#a6a098" stroke="#665e55"/>`).join('');
-   const tableSvg=roomTables.map(t=>{const b=assignments.get(Number(t.id));const x=Number(t.x),y=Number(t.y),w=Number(t.w),h=Number(t.h);const cx=x+w/2,cy=y+h/2;const isCircle=t.shape==='circle';const shape=isCircle?`<ellipse cx="${cx}" cy="${cy}" rx="${w/2}" ry="${h/2}"/>`:`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="9"/>`;const name=b?String(b.name||'').slice(0,34):'';const lines=name.match(/.{1,19}(?:\\s|$)/g)||[name];return `<g class="print-table ${b?'occupied':'free'}" transform="rotate(${Number(t.rotation)||0},${cx},${cy})"><g fill="${b?'#d8e5d4':'#eee5d8'}" stroke="${b?'#4f7b55':'#a5947b'}" stroke-width="2">${shape}</g><text x="${cx}" y="${cy-12}" font-weight="700" font-size="20" text-anchor="middle">${safe(t.code)}</text>${b?`<text x="${cx}" y="${cy+7}" font-size="12" text-anchor="middle" font-weight="600">${safe(name.slice(0,19))}</text><text x="${cx}" y="${cy+23}" font-size="11" text-anchor="middle">${Number(b.party_size)} persone</text>`:''}</g>`}).join('');
-   return `<div class="print-room"><h3>${safe(room.name)}</h3><svg class="print-room-svg" viewBox="0 0 1100 700" role="img" aria-label="Piantina ${safe(room.name)}"><rect x="0" y="0" width="1100" height="700" fill="#faf8f4"/>${shapes}${obstacles}${tableSvg}</svg></div>`;
-  }).join('');
-  return `<section class="print-service"><h2>${serviceName(svc)}</h2><div class="print-summary">${items.length} prenotazioni · ${items.reduce((n,r)=>n+Number(r.party_size||0),0)} coperti</div>${mode==='plan'?roomPrint:''}${tableBlock(items)}</section>`;
+ const day=state.date, selected=state.reservationService||'all';
+ const dayLabel=day.split('-').reverse().join('/');
+ const serviceLabel=s=>s==='lunch'?'Pranzo':'Cena';
+ const services=selected==='all'?['lunch','dinner']:[selected];
+ const booked=(state.reservations||[]).filter(r=>r.status==='confirmed');
+ const cleanNumber=n=>Number.isFinite(Number(n))?Number(n):0;
+ const rect=r=>({x:cleanNumber(r.x),y:cleanNumber(r.y),w:Math.max(1,cleanNumber(r.w)),h:Math.max(1,cleanNumber(r.h))});
+ const boxOf=(rects,padding=16)=>{
+  const rs=rects.length?rects:[{x:0,y:0,w:1100,h:700}];
+  const x=Math.min(...rs.map(r=>r.x))-padding,y=Math.min(...rs.map(r=>r.y))-padding;
+  const xmax=Math.max(...rs.map(r=>r.x+r.w))+padding,ymax=Math.max(...rs.map(r=>r.y+r.h))+padding;
+  return {x,y,w:xmax-x,h:ymax-y};
  };
+ // Restituisce un contorno per l'unione dei rettangoli: i lati condivisi spariscono.
+ const unionOutline=zones=>{
+  if(!zones.length)return '';
+  const rs=zones.map(rect);
+  const xs=[...new Set(rs.flatMap(r=>[r.x,r.x+r.w]))].sort((a,b)=>a-b);
+  const ys=[...new Set(rs.flatMap(r=>[r.y,r.y+r.h]))].sort((a,b)=>a-b);
+  const inside=(i,j)=>i>=0&&j>=0&&i<xs.length-1&&j<ys.length-1&&rs.some(r=>{
+   const px=(xs[i]+xs[i+1])/2,py=(ys[j]+ys[j+1])/2;
+   return px>=r.x&&px<r.x+r.w&&py>=r.y&&py<r.y+r.h;
+  });
+  const edges=[];
+  for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++)if(inside(i,j)){
+   const x1=xs[i],x2=xs[i+1],y1=ys[j],y2=ys[j+1];
+   if(!inside(i,j-1))edges.push(`M ${x1} ${y1} H ${x2}`);
+   if(!inside(i,j+1))edges.push(`M ${x1} ${y2} H ${x2}`);
+   if(!inside(i-1,j))edges.push(`M ${x1} ${y1} V ${y2}`);
+   if(!inside(i+1,j))edges.push(`M ${x2} ${y1} V ${y2}`);
+  }
+  return edges.join(' ');
+ };
+ const listTable=items=>`<table class="bookings"><thead><tr><th>Ora</th><th>Cliente</th><th>Persone</th><th>Tavolo</th><th>Telefono</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.time)}</td><td>${esc(r.name)}</td><td>${cleanNumber(r.party_size)}</td><td>${esc(r.table_codes||'Non assegnato')}</td><td>${esc(r.phone||'')}</td></tr>`).join('')||'<tr><td colspan="5">Nessuna prenotazione confermata</td></tr>'}</tbody></table>`;
+ const svgRoom=(room,tables,zones,structures,items)=>{
+  const roomTables=tables.filter(t=>Number(t.room_id)===Number(room.id)&&t.enabled!==0);
+  const roomZones=zones.filter(z=>Number(z.room_id)===Number(room.id));
+  const roomStructures=structures.filter(f=>Number(f.room_id)===Number(room.id));
+  const zoneRects=roomZones.map(rect);
+  // La cornice deve seguire la SALA, non l'intera area dell'editor.
+  const bounds=boxOf(zoneRects.length?zoneRects:roomTables.map(rect),20);
+  const assignment=new Map();
+  for(const r of items.filter(r=>Number(r.room_id)===Number(room.id)))for(const id of String(r.table_ids||'').split(',').map(Number).filter(Boolean))assignment.set(id,r);
+  const clipId='room-clip-'+room.id;
+  const hasZones=zoneRects.length>0;
+  const zoneShapes=zoneRects.map(r=>`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`).join('');
+  const border=hasZones?`<path d="${unionOutline(roomZones)}" fill="none" stroke="#a78962" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`:`<rect x="${bounds.x+18}" y="${bounds.y+18}" width="${bounds.w-36}" height="${bounds.h-36}" rx="7" fill="none" stroke="#a78962" stroke-width="2.4"/>`;
+  const cols=roomStructures.map(f=>{
+   const r=rect(f),cx=r.x+r.w/2,cy=r.y+r.h/2;
+   const shape=f.kind==='column'?`<ellipse cx="${cx}" cy="${cy}" rx="${r.w/2}" ry="${r.h/2}"/>`:`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${f.kind==='wall'?1:5}"/>`;
+   return `<g fill="#a69e92" stroke="#685f54" stroke-width="1.4" transform="rotate(${cleanNumber(f.rotation)},${cx},${cy})">${shape}</g>`;
+  }).join('');
+  const tableSvg=roomTables.map(t=>{
+   const r=rect(t),cx=r.x+r.w/2,cy=r.y+r.h/2;
+   const booking=assignment.get(Number(t.id));
+   const occupied=!!booking;
+   const shape=t.shape==='circle'?`<ellipse cx="${cx}" cy="${cy}" rx="${r.w/2}" ry="${r.h/2}"/>`:`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="9"/>`;
+   const name=String(booking?.name||'').trim();
+   const small=Math.min(r.w,r.h)<64;
+   const codeFont=small?17:22;
+   const nameFont=small?9:11.5;
+   const maxTextW=Math.max(18,r.w-10);
+   const codeY=occupied?cy-(small?17:23):cy+codeFont*.33;
+   const words=name.split(/\s+/).filter(Boolean);
+   const first=words.length>1?words[0]:name;
+   const second=words.length>1?words.slice(1).join(' '):'';
+   const nameLine=(part,y)=>{const len=Math.min(maxTextW,Math.max(12,part.length*nameFont*.52));return `<text x="${cx}" y="${y}" font-size="${nameFont}" font-weight="700" textLength="${len}" lengthAdjust="spacingAndGlyphs">${esc(part)}</text>`};
+   const guestText=booking?`${cleanNumber(booking.party_size)} ${cleanNumber(booking.party_size)===1?'persona':'persone'}`:'';
+   return `<g transform="rotate(${cleanNumber(t.rotation)},${cx},${cy})"><g fill="${occupied?'#d9e7db':'#e9dcc8'}" stroke="${occupied?'#4e7855':'#9e8768'}" stroke-width="2">${shape}</g><g fill="#30291f" font-family="Arial,sans-serif" text-anchor="middle"><text x="${cx}" y="${codeY}" font-size="${codeFont}" font-weight="700">${esc(t.code)}</text>${occupied?`${nameLine(first,cy-4)}${second?nameLine(second,cy+10):''}<text x="${cx}" y="${cy+(second?25:17)}" font-size="9.5">${esc(guestText)}</text>`:''}</g></g>`;
+  }).join('');
+  const clip=`<clipPath id="${clipId}">${hasZones?zoneShapes:`<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}"/>`}</clipPath>`;
+  const drawing=`<defs>${clip}</defs><rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}" fill="#fffdfa"/><g clip-path="url(#${clipId})"><g fill="#f1e6d5">${zoneShapes}</g>${cols}${tableSvg}</g>${border}`;
+  return {svg:`<svg class="room-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Piantina ${esc(room.name)}">${drawing}</svg>`,portrait:bounds.h>=bounds.w*1.05};
+ };
+ const buildPage=(heading,sub,content,landscape=false,kind='plan')=>`<section class="sheet ${landscape?'landscape':'portrait'} ${kind}"><header class="sheet-head"><div><div class="brand">L’OASI<span class="dot">.</span></div><div class="tagline">F.LLI FERA · DAL 1997</div></div><div class="head-right"><strong>${esc(dayLabel)}</strong><span>${esc(sub)}</span></div></header><div class="sheet-title"><div><span class="eyebrow">${kind==='plan'?'PIANTINA OPERATIVA':'ELENCO PRENOTAZIONI'}</span><h1>${esc(heading)}</h1></div></div>${content}<footer class="sheet-foot"><span>RISTORANTE OASI · ROCCABERNARDA</span><span>Uso interno · ${esc(dayLabel)}</span></footer></section>`;
+ const printCSS=`
+ *{box-sizing:border-box}html,body{margin:0;background:#fff;color:#29231c;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .sheet{width:100%;height:100%;padding:0;display:flex;flex-direction:column;page-break-after:always;break-after:page;overflow:hidden}
+ .sheet:last-child{break-after:auto;page-break-after:auto}
+ .sheet-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1.6px solid #b2946e;padding:0 0 3mm;margin:0 0 3mm;flex-shrink:0}
+ .brand{font:normal 27pt Georgia,serif;line-height:.9}.brand .dot{color:#b2956c}.tagline{font-size:7.5pt;letter-spacing:2px;margin-top:2mm}
+ .head-right{text-align:right;font-size:10pt;display:grid;gap:1mm}.head-right span{color:#8b7457;font-size:9pt}
+ .sheet-title{display:flex;align-items:end;justify-content:space-between;margin:1mm 0 3mm;flex-shrink:0}.eyebrow{display:block;font-size:7pt;color:#9b7950;letter-spacing:2px;font-weight:700}.sheet-title h1{margin:1mm 0 0;font:normal 22pt Georgia,serif}
+ .room-figure{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;overflow:hidden;width:100%;background:#fffdfa}
+ .room-svg{display:block;width:100%;height:100%;min-height:0;max-width:100%;max-height:100%}
+ .sheet-foot{border-top:1px solid #e7d9c6;display:flex;justify-content:space-between;padding-top:2mm;margin-top:3mm;flex-shrink:0;color:#8b7457;font-size:7pt;letter-spacing:1px}
+ .bookings{width:100%;border-collapse:collapse;margin-top:4mm;font-size:11pt;table-layout:fixed}.bookings th,.bookings td{border-bottom:1px solid #dfd4c4;padding:3mm 2mm;text-align:left;overflow-wrap:anywhere}.bookings th{background:#f5efe6;font-size:9pt;color:#7b6244}.bookings th:nth-child(1){width:13%}.bookings th:nth-child(3){width:14%}.bookings th:nth-child(4){width:14%}.bookings th:nth-child(5){width:22%}
+ @page {size:A4 portrait;margin:8mm}
+ @media print{html,body{height:auto}.sheet.portrait{height:281mm}.sheet.landscape{height:194mm} .sheet{break-inside:avoid}}
+ `;
+ const generated=[];
  (async()=>{
- try{const list=service==='all'?['lunch','dinner']:[service];const html=await Promise.all(list.map(renderService));mount.innerHTML=header+html.join('');document.body.appendChild(mount);const cleanup=()=>{mount.remove();window.removeEventListener('afterprint',cleanup)};window.addEventListener('afterprint',cleanup,{once:true});window.print();setTimeout(()=>{if(mount.isConnected)cleanup()},60000)}catch(err){mount.remove();msg('Impossibile preparare la stampa: '+err.message,'error')}
+  try{
+   const [rooms,tables,zones,structures]=mode==='plan'?await Promise.all([api('admin/rooms'),api('admin/tables'),api('admin/room-zones'),api('admin/floor-elements')]):[[],[],[],[]];
+   for(const svc of services){
+    const items=booked.filter(r=>r.service===svc);
+    if(mode==='list'){
+     generated.push(buildPage(serviceLabel(svc),serviceLabel(svc),listTable(items),false,'list'));
+     continue;
+    }
+    const roomIds=[...new Set(items.map(r=>Number(r.room_id)).filter(Boolean))];
+    for(const room of rooms.filter(r=>roomIds.includes(Number(r.id)))){
+     const {svg,portrait}=svgRoom(room,tables,zones,structures,items);
+     generated.push(buildPage(room.name,`${serviceLabel(svc)} · ${items.filter(r=>Number(r.room_id)===Number(room.id)).length} prenotazioni · ${items.filter(r=>Number(r.room_id)===Number(room.id)).reduce((n,r)=>n+Number(r.party_size||0),0)} coperti`,`<div class="room-figure">${svg}</div>`,!portrait,'plan'));
+    }
+   }
+   if(!generated.length){msg('Non ci sono prenotazioni con tavoli assegnati per il servizio selezionato','error');return}
+   // Finestra di stampa isolata: non eredita NESSUNA regola CSS dell'editor.
+   const landscape=generated.every(p=>p.includes('class="sheet landscape'));
+   const frame=document.createElement('iframe');frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';document.body.appendChild(frame);
+   const doc=frame.contentDocument;
+   doc.open();doc.write(`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Oasi · ${esc(dayLabel)} · ${esc(selected==='all'?'Pranzo e cena':serviceLabel(selected))}</title><style>${printCSS.replace('@page {size:A4 portrait;margin:8mm}',`@page {size:A4 ${landscape?'landscape':'portrait'};margin:8mm}`)}</style></head><body>${generated.join('')}</body></html>`);doc.close();
+   const cleanup=()=>{frame.remove();window.removeEventListener('afterprint',cleanup)};
+   window.addEventListener('afterprint',cleanup,{once:true});
+   frame.contentWindow.addEventListener('afterprint',cleanup,{once:true});
+   frame.contentWindow.focus();frame.contentWindow.print();
+   setTimeout(()=>{if(frame.isConnected)cleanup()},60000);
+  }catch(err){msg('Errore nella preparazione della stampa: '+err.message,'error')}
  })();
 }
 function bindAdmin(){document.querySelectorAll('[data-quick]').forEach(el=>el.addEventListener('click',()=>{state.adminView=el.dataset.quick;renderAdmin()}));if(state.adminView==='faq'){const wrap=$('#faq-admin-items');const add=()=>{const div=document.createElement('div');div.className='faq-admin-row';div.innerHTML='<label>Domanda<input name="question" maxlength="220" required></label><label>Risposta<textarea name="answer" maxlength="1500" rows="3" required></textarea></label><button type="button" class="mini danger faq-remove">Elimina</button>';wrap.append(div);div.querySelector('input')?.focus()};$('#faq-add')?.addEventListener('click',add);wrap?.addEventListener('click',e=>{if(e.target.closest('.faq-remove'))e.target.closest('.faq-admin-row')?.remove()});$('#faq-admin-form')?.addEventListener('submit',async e=>{e.preventDefault();const faqs=[...wrap.querySelectorAll('.faq-admin-row')].map(el=>({question:el.querySelector('[name="question"]').value.trim(),answer:el.querySelector('[name="answer"]').value.trim()})).filter(x=>x.question&&x.answer);try{await api('admin/settings/site','PUT',{...state.settings.site,faqs});state.settings.site.faqs=faqs;msg('FAQ salvate: ricarica la homepage per vedere le modifiche')}catch(x){msg(x.message,'error')}})}document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.adminView=b.dataset.tab;renderAdmin()});$('#mobile-tab')?.addEventListener('change',e=>{state.adminView=e.target.value;renderAdmin()});$('#logout')?.addEventListener('click',async()=>{await api('admin/logout','POST',{});location.href='/admin'});$('#admin-date')?.addEventListener('change',e=>{state.date=e.target.value;renderAdmin()});$('#reservation-service')?.addEventListener('change',e=>{state.reservationService=e.target.value;renderAdmin()});const moveReservationDay=(n)=>{const d=new Date(state.date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);state.date=d.toISOString().slice(0,10);renderAdmin()};$('#reservation-prev')?.addEventListener('click',()=>moveReservationDay(-1));$('#reservation-next')?.addEventListener('click',()=>moveReservationDay(1));$('#reservation-today')?.addEventListener('click',()=>{state.date=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'});renderAdmin()});$('#print-reservations')?.addEventListener('click',()=>printOasiReservations('list'));$('#print-reservation-plan')?.addEventListener('click',()=>printOasiReservations('plan'));$('#new-room')?.addEventListener('click',()=>editEntity('rooms',{internal_enabled:1}));$('#new-menu')?.addEventListener('click',()=>editEntity('menu',{section:'piatti',available:1}));$('#new-gallery')?.addEventListener('click',()=>editEntity('gallery',{}));document.querySelectorAll('[data-edit-room]').forEach(b=>b.onclick=()=>editEntity('rooms',state.rooms.find(x=>x.id==b.dataset.editRoom)));document.querySelectorAll('[data-edit-menu]').forEach(b=>b.onclick=()=>editEntity('menu',state.menu.find(x=>x.id==b.dataset.editMenu)));document.querySelectorAll('[data-edit-gallery]').forEach(b=>b.onclick=()=>editEntity('gallery',state.gallery.find(x=>x.id==b.dataset.editGallery)));document.querySelectorAll('[data-delete-room]').forEach(b=>b.onclick=()=>deleteEntity('rooms',b.dataset.deleteRoom));document.querySelectorAll('[data-delete-menu]').forEach(b=>b.onclick=()=>deleteEntity('menu',b.dataset.deleteMenu));document.querySelectorAll('[data-delete-gallery]').forEach(b=>b.onclick=()=>deleteEntity('gallery',b.dataset.deleteGallery));$('#room-select')?.addEventListener('change',e=>{state.room=Number(e.target.value);renderAdmin()});$('#new-structure')?.addEventListener('click',()=>structureEditor());$('#new-zone')?.addEventListener('click',()=>{const zones=state.roomZones.filter(z=>z.room_id===state.room);zoneEditor(zones.length?{label:'Nuova ala',x:430,y:235,w:260,h:180}:{label:'Area principale',x:20,y:20,w:520,h:320})});$('#save-floor-standard')?.addEventListener('click',async()=>{try{await api('admin/floor-template','PUT',{room_id:state.room});msg('Piantina standard salvata');renderAdmin()}catch(e){msg(e.message,'error')}});$('#restore-floor-standard')?.addEventListener('click',async()=>{if(!confirm('Ripristinare la piantina standard della sala selezionata? Le modifiche correnti verranno annullate.'))return;try{await api('admin/floor-template','POST',{room_id:state.room});msg('Piantina standard ripristinata');renderAdmin()}catch(e){msg(e.message,'error')}});$('#print-floor')?.addEventListener('click',()=>window.print());const toggleFloorExpanded=()=>{const wrap=$('.floor-canvas-panel');const expanded=wrap?.classList.toggle('floor-expanded');document.body.classList.toggle('floor-mode-expanded',!!expanded);$('#floor-expand').textContent=expanded?'× Chiudi area grande':'⛶ Area di lavoro grande';requestAnimationFrame(applyFloorZoom);};$('#floor-expand')?.addEventListener('click',toggleFloorExpanded);$('#floor-close-large')?.addEventListener('click',toggleFloorExpanded);
