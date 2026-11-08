@@ -248,3 +248,23 @@ a:hover .oasi-arrow{transform:translate(2px,-3px)}
 .floor-zone-resize:after{content:'';position:absolute;right:6px;bottom:6px;width:9px;height:9px;border-right:2px solid #fff;border-bottom:2px solid #fff}
 .zone-editor-instruction{grid-column:1/-1;background:#f7f1e7;border:1px solid #e5d4bb;border-radius:14px;padding:13px 15px;color:#65513a;font-size:13px;line-height:1.55}
 @media print{.floor-zone{outline:none!important}.floor-zone-resize{display:none!important}.floor-union-fill{fill:#eadcc5!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+
+/* V6: editor della sala più grande, tavoli ridimensionabili */
+.floor-editor-layout{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:18px!important}
+.floor-canvas-panel{width:100%;min-width:0}
+.floor-board-scroll{max-width:100%;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.floor-board{width:1100px!important;min-width:1100px!important;height:700px!important;min-height:700px!important;aspect-ratio:auto!important;background-size:28px 28px}
+.floor-inspector{position:static!important;max-width:1100px;width:100%;margin:0 auto}
+.floor-table{overflow:visible!important;min-height:55px;min-width:55px}
+.floor-table-resize{position:absolute;right:-3px;bottom:-3px;width:23px;height:23px;border-radius:8px 0 8px 0;background:#a98962;border:2px solid #f9f2e7;box-shadow:0 0 0 1px #9b7650;cursor:nwse-resize;touch-action:none;z-index:4}
+.floor-table-resize:after{content:'';position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-right:2px solid #fff;border-bottom:2px solid #fff}
+.floor-table:hover,.floor-table:focus-visible{z-index:6!important}
+.floor-service-actions .mini{border-radius:13px;min-height:40px;padding:9px 14px}
+.floor-mode-expanded{overflow:hidden}
+.floor-mode-expanded .floor-canvas-panel.floor-expanded{position:fixed;inset:12px;z-index:1000;background:#fff;box-shadow:0 20px 70px #0004;border:1px solid #d9c9b2!important;overflow:auto;padding:18px!important;display:flex;flex-direction:column}
+.floor-mode-expanded .floor-expanded .floor-board-scroll{flex:1;max-height:calc(100vh - 115px);min-height:250px;border:1px solid #d9cbb9}
+.floor-mode-expanded .floor-expanded .floor-hint,.floor-mode-expanded .floor-expanded .floor-legend{display:none}
+.floor-close-large{display:none;border:1px solid #a58b69;background:#292520;color:#fff;padding:10px 18px;border-radius:22px;font-weight:600;margin-bottom:12px;align-self:flex-end}
+.floor-mode-expanded .floor-close-large{display:block}
+@media(max-width:760px){.floor-board-scroll{max-height:70vh}.floor-mode-expanded .floor-expanded .floor-board-scroll{max-height:calc(100dvh - 105px)}.floor-canvas-panel{padding:12px!important}}
+@media print{.floor-mode-expanded{overflow:visible}.floor-close-large,.floor-table-resize{display:none!important}.floor-board{width:1100px!important;height:700px!important;min-width:1100px!important;min-height:700px!important;zoom:.7;margin:0 auto}.floor-canvas-panel{position:static!important;overflow:visible!important}}
