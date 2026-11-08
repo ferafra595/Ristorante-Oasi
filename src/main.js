@@ -279,7 +279,7 @@ function printOasiReservations(mode='plan'){
   const drawing=`<defs>${clip}</defs><rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}" fill="#fffdfa"/><g clip-path="url(#${clipId})"><g fill="#f1e6d5">${zoneShapes}</g>${cols}${tableSvg}</g>${border}`;
   return {svg:`<svg class="room-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Piantina ${esc(room.name)}">${drawing}</svg>`,portrait:bounds.h>=bounds.w*1.05};
  };
- const buildPage=(heading,sub,content,landscape=false,kind='plan')=>`<section class="sheet ${landscape?'landscape':'portrait'} ${kind}"><header class="sheet-head"><div><div class="brand">L’OASI<span class="dot">.</span></div><div class="tagline">F.LLI FERA · DAL 1997</div></div><div class="head-right"><strong>${esc(dayLabel)}</strong><span>${esc(sub)}</span></div></header><div class="sheet-title"><div><span class="eyebrow">${kind==='plan'?'PIANTINA OPERATIVA':'ELENCO PRENOTAZIONI'}</span><h1>${esc(heading)}</h1></div></div>${content}<footer class="sheet-foot"><span>RISTORANTE OASI · ROCCABERNARDA</span><span>Uso interno · ${esc(dayLabel)}</span></footer></section>`;
+ const buildPage=(heading,sub,content,landscape=false,kind='plan',svc='')=>`<section class="sheet ${landscape?'landscape':'portrait'} ${kind}"><header class="sheet-head"><div><div class="brand">L’OASI<span class="dot">.</span></div><div class="tagline">F.LLI FERA · DAL 1997</div></div><div class="head-right"><strong>${esc(dayLabel)}</strong><span>${esc(serviceLabel(svc || (selected==='all'?'lunch':selected)))}</span></div></header><div class="sheet-title"><div><span class="eyebrow">${kind==='plan'?'PIANTINA E PRENOTAZIONI':'ELENCO PRENOTAZIONI'}</span><h1>${kind==='plan'?esc(serviceLabel(svc)):esc(heading)}</h1>${kind==='plan'?`<p class="sheet-room-name">${esc(heading)}</p>`:''}</div><div class="sheet-counter">${esc(sub)}</div></div>${content}<footer class="sheet-foot"><span>RISTORANTE OASI · ROCCABERNARDA</span><span>Uso interno · ${esc(dayLabel)}</span></footer></section>`;
  const printCSS=`
  *{box-sizing:border-box}html,body{margin:0;background:#fff;color:#29231c;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
  .sheet{width:100%;height:100%;padding:0;display:flex;flex-direction:column;page-break-after:always;break-after:page;overflow:hidden}
@@ -288,8 +288,17 @@ function printOasiReservations(mode='plan'){
  .brand{font:normal 27pt Georgia,serif;line-height:.9}.brand .dot{color:#b2956c}.tagline{font-size:7.5pt;letter-spacing:2px;margin-top:2mm}
  .head-right{text-align:right;font-size:10pt;display:grid;gap:1mm}.head-right span{color:#8b7457;font-size:9pt}
  .sheet-title{display:flex;align-items:end;justify-content:space-between;margin:1mm 0 3mm;flex-shrink:0}.eyebrow{display:block;font-size:7pt;color:#9b7950;letter-spacing:2px;font-weight:700}.sheet-title h1{margin:1mm 0 0;font:normal 22pt Georgia,serif}
+ .sheet-room-name{font:normal 13pt Arial,sans-serif;margin:1.5mm 0 0;color:#514334}
+ .sheet-counter{font-size:9pt;color:#75624d;text-align:right;align-self:end;max-width:48%}
  .room-figure{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;overflow:hidden;width:100%;background:#fffdfa}
  .room-svg{display:block;width:100%;height:100%;min-height:0;max-width:100%;max-height:100%}
+ .plan-bookings{flex:0 0 auto;margin-top:3mm;break-inside:avoid}
+ .plan-bookings-title{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #decdb7;padding-top:2.5mm;font-size:9pt;font-weight:700;letter-spacing:.02em}
+ .plan-bookings-title small{font-size:8pt;color:#816d57;font-weight:400}
+ .plan .bookings{margin:2mm 0 0;font-size:9pt;table-layout:fixed}
+ .plan .bookings th{font-size:8pt}
+ .plan .bookings th,.plan .bookings td{padding:1.6mm 1.8mm;line-height:1.15}
+ .plan .bookings th:nth-child(1){width:13%}.plan .bookings th:nth-child(3){width:12%}.plan .bookings th:nth-child(4){width:15%}.plan .bookings th:nth-child(5){width:24%}
  .sheet-foot{border-top:1px solid #e7d9c6;display:flex;justify-content:space-between;padding-top:2mm;margin-top:3mm;flex-shrink:0;color:#8b7457;font-size:7pt;letter-spacing:1px}
  .bookings{width:100%;border-collapse:collapse;margin-top:4mm;font-size:11pt;table-layout:fixed}.bookings th,.bookings td{border-bottom:1px solid #dfd4c4;padding:3mm 2mm;text-align:left;overflow-wrap:anywhere}.bookings th{background:#f5efe6;font-size:9pt;color:#7b6244}.bookings th:nth-child(1){width:13%}.bookings th:nth-child(3){width:14%}.bookings th:nth-child(4){width:14%}.bookings th:nth-child(5){width:22%}
  @page {size:A4 portrait;margin:8mm}
@@ -302,13 +311,17 @@ function printOasiReservations(mode='plan'){
    for(const svc of services){
     const items=booked.filter(r=>r.service===svc);
     if(mode==='list'){
-     generated.push(buildPage(serviceLabel(svc),serviceLabel(svc),listTable(items),false,'list'));
+     generated.push(buildPage(serviceLabel(svc),serviceLabel(svc),listTable(items),false,'list',svc));
      continue;
     }
     const roomIds=[...new Set(items.map(r=>Number(r.room_id)).filter(Boolean))];
     for(const room of rooms.filter(r=>roomIds.includes(Number(r.id)))){
      const {svg,portrait}=svgRoom(room,tables,zones,structures,items);
-     generated.push(buildPage(room.name,`${serviceLabel(svc)} · ${items.filter(r=>Number(r.room_id)===Number(room.id)).length} prenotazioni · ${items.filter(r=>Number(r.room_id)===Number(room.id)).reduce((n,r)=>n+Number(r.party_size||0),0)} coperti`,`<div class="room-figure">${svg}</div>`,!portrait,'plan'));
+     const roomBookings=items.filter(r=>Number(r.room_id)===Number(room.id));
+     const count=roomBookings.length, totalGuests=roomBookings.reduce((n,r)=>n+Number(r.party_size||0),0);
+     const tableHeight=Math.max(22,Math.min(80,11+count*7));
+     const content=`<div class="room-figure" style="max-height:calc(100% - ${tableHeight}mm)">${svg}</div><div class="plan-bookings"><div class="plan-bookings-title"><span>Elenco prenotazioni · ${esc(serviceLabel(svc))}</span><small>${count} prenotazioni · ${totalGuests} coperti</small></div>${listTable(roomBookings)}</div>`;
+     generated.push(buildPage(room.name,`${count} prenotazioni · ${totalGuests} coperti`,content,!portrait,'plan',svc));
     }
    }
    if(!generated.length){msg('Non ci sono prenotazioni con tavoli assegnati per il servizio selezionato','error');return}
