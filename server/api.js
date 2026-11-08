@@ -57,11 +57,32 @@ async function restoreRoomTemplate(db,roomId){
  return true;
 }
 
+async function ensureOperations(db){
+ await db.prepare(`CREATE TABLE IF NOT EXISTS service_visits(reservation_id INTEGER PRIMARY KEY REFERENCES reservations(id) ON DELETE CASCADE, state TEXT NOT NULL DEFAULT 'expected' CHECK(state IN ('expected','arrived','seated','finished','no_show')), updated_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '')`).run();
+ await db.prepare(`CREATE TABLE IF NOT EXISTS service_blocks(id INTEGER PRIMARY KEY AUTOINCREMENT,book_date TEXT NOT NULL,service TEXT NOT NULL CHECK(service IN ('lunch','dinner')),scope TEXT NOT NULL CHECK(scope IN ('service','room','table')),target_id INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,UNIQUE(book_date,service,scope,target_id))`).run();
+}
+async function serviceBlocks(db,date,service){await ensureOperations(db);return (await db.prepare('SELECT * FROM service_blocks WHERE book_date=? AND service=? ORDER BY scope,id').bind(date,service).all()).results||[]}
+async function operationsData(db,date,service){
+ await ensureOperations(db);await ensureFloorV3(db);
+ const filter=service==='all'?'':' AND r.service=?';const params=service==='all'?[date]:[date,service];
+ const [reservations,rooms,tables,blocks]=await Promise.all([
+  db.prepare(`SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(v.note,'') visit_note,GROUP_CONCAT(t.id) table_ids,GROUP_CONCAT(t.code,', ') table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=?${filter} GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id`).bind(...params).all(),
+  db.prepare('SELECT id,name,public_enabled,internal_enabled FROM rooms ORDER BY sort_order,id').all(),
+  db.prepare('SELECT t.*,COALESCE(d.min_seats,1) min_seats FROM tables t LEFT JOIN table_details d ON d.table_id=t.id ORDER BY t.room_id,t.id').all(),
+  db.prepare("SELECT * FROM service_blocks WHERE book_date=? "+(service==='all'?'':'AND service=? ')+"ORDER BY service,scope,id").bind(...params).all()
+ ]);
+ return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:blocks.results||[]};
+}
 async function candidates(db,roomIds,date,service,party){
  if(!roomIds.length)return [];
  await ensureFloorV3(db);
+ const currentBlocks=await serviceBlocks(db,date,service);
+ if(currentBlocks.some(b=>b.scope==='service'))return [];
+ const blockedRooms=new Set(currentBlocks.filter(b=>b.scope==='room').map(b=>Number(b.target_id)));
+ const blockedTables=new Set(currentBlocks.filter(b=>b.scope==='table').map(b=>Number(b.target_id)));
+ roomIds=roomIds.filter(id=>!blockedRooms.has(Number(id)));if(!roomIds.length)return [];
  const ts=await db.prepare(`SELECT t.*,COALESCE(d.min_seats,1) min_seats FROM tables t LEFT JOIN table_details d ON d.table_id=t.id WHERE t.room_id IN (${roomIds.map(()=>'?').join(',')}) AND t.enabled=1 AND NOT EXISTS(SELECT 1 FROM reservation_tables rt WHERE rt.table_id=t.id AND rt.book_date=? AND rt.service=?) ORDER BY t.seats,t.id`).bind(...roomIds,date,service).all();
- const free=ts.results||[];
+ const free=(ts.results||[]).filter(t=>!blockedTables.has(Number(t.id)));
  const options=free.filter(t=>t.seats>=party&&t.min_seats<=party).map(t=>({ids:[t.id],room_id:t.room_id,capacity:t.seats,code:t.code}));
  if(!free.length)return options;
  const allLinks=(await db.prepare('SELECT table_a,table_b FROM table_links').all()).results;
@@ -105,6 +126,45 @@ const user=await currentUser(db,ctx.request);
 if(!user||user.email!=='oasi-admin@internal.invalid')return fail('Accesso richiesto',401);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
+if(resource==='operations'){
+ if(method!=='GET')return fail('Metodo non valido',405);
+ const query=new URL(ctx.request.url).searchParams,date=query.get('date')||today(),service=query.get('service')||'all';
+ if(!dateOk(date)||!['all','lunch','dinner'].includes(service))return fail('Data o servizio non valido');
+ return json(await operationsData(db,date,service));
+}
+if(resource==='visits'){
+ if(method!=='PATCH')return fail('Metodo non valido',405);
+ await ensureOperations(db);
+ const id=Number(parts[2]),state=clean(b.state,30),note=clean(b.note,500);
+ if(!Number.isInteger(id)||id<=0||!['expected','arrived','seated','finished','no_show'].includes(state))return fail('Stato non valido');
+ const res=await db.prepare('SELECT id,status FROM reservations WHERE id=?').bind(id).first();
+ if(!res)return fail('Prenotazione inesistente',404);
+ if(res.status!=='confirmed')return fail('Non puoi aggiornare una prenotazione annullata',409);
+ await db.prepare(`INSERT INTO service_visits(reservation_id,state,updated_at,note) VALUES(?,?,?,?) ON CONFLICT(reservation_id) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at,note=excluded.note`).bind(id,state,now(),note).run();
+ return json({ok:true,reservation_id:id,state});
+}
+if(resource==='blocks'){
+ await ensureOperations(db);
+ if(method==='GET'){
+  const q=new URL(ctx.request.url).searchParams,date=q.get('date')||today(),service=q.get('service')||'all';
+  if(!dateOk(date)||!['all','lunch','dinner'].includes(service))return fail('Data o servizio non valido');
+  const args=service==='all'?[date]:[date,service];
+  const rows=await db.prepare('SELECT * FROM service_blocks WHERE book_date=? '+(service==='all'?'':'AND service=? ')+'ORDER BY service,scope,id').bind(...args).all();return json(rows.results||[]);
+ }
+ if(method==='POST'){
+  const date=clean(b.date,10),service=clean(b.service,8),scope=clean(b.scope,10),target=scope==='service'?0:Number(b.target_id);
+  if(!dateOk(date)||!['lunch','dinner'].includes(service)||!['service','room','table'].includes(scope)||!Number.isInteger(target)||target<0||(scope!=='service'&&target<1))return fail('Dati blocco non validi');
+  if(scope==='room'&&!(await db.prepare('SELECT id FROM rooms WHERE id=?').bind(target).first()))return fail('Sala inesistente',404);
+  if(scope==='table'&&!(await db.prepare('SELECT id FROM tables WHERE id=?').bind(target).first()))return fail('Tavolo inesistente',404);
+  await db.prepare(`INSERT INTO service_blocks(book_date,service,scope,target_id,reason,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(book_date,service,scope,target_id) DO UPDATE SET reason=excluded.reason`).bind(date,service,scope,target,clean(b.reason,200),now()).run();
+  return json({ok:true});
+ }
+ if(method==='DELETE'){
+  const id=Number(parts[2]);if(!Number.isInteger(id)||id<1)return fail('Blocco non valido');
+  await db.prepare('DELETE FROM service_blocks WHERE id=?').bind(id).run();return json({ok:true});
+ }
+ return fail('Metodo non valido',405);
+}
 if(resource==='dashboard'){const date=clean(new URL(ctx.request.url).searchParams.get('date')||today());const bookings=await db.prepare("SELECT service,COUNT(*) bookings,COALESCE(SUM(party_size),0) guests FROM reservations WHERE book_date=? AND status='confirmed' GROUP BY service").bind(date).all();const month=await db.prepare("SELECT substr(book_date,1,7) month,COUNT(*) bookings,COALESCE(SUM(party_size),0) guests FROM reservations WHERE status='confirmed' GROUP BY substr(book_date,1,7) ORDER BY month DESC LIMIT 12").all();return json({bookings:bookings.results,months:month.results})}
 if(resource==='settings'){if(method==='GET')return json({site:await config(db,'site'),booking:await config(db,'booking')});if(method==='PUT'){const key=parts[2];if(!['site','booking'].includes(key))return fail('Impostazione non valida');await db.prepare('UPDATE settings SET value=? WHERE key=?').bind(JSON.stringify(b),key).run();return json({ok:true})}}
 if(resource==='floor-elements'){
@@ -194,7 +254,7 @@ if(resource==='tables'){
  }
  if(method==='DELETE'){const id=Number(parts[2]);const count=await db.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE table_id=?').bind(id).first();if(count.n)return fail('Questo tavolo ha prenotazioni storiche: disattivalo invece di eliminarlo');await db.prepare('DELETE FROM table_links WHERE table_a=? OR table_b=?').bind(id,id).run();await db.prepare('DELETE FROM table_details WHERE table_id=?').bind(id).run();await db.prepare('DELETE FROM tables WHERE id=?').bind(id).run();return json({ok:true})}
 }
-if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,GROUP_CONCAT(t.code, ', ') table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);if(b.status==='cancelled'){await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id)]);return json({ok:true})}const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];if(!tableIds.length)return fail('Indica i tavoli da assegnare');const existing=(await db.prepare('SELECT id,room_id,seats FROM tables WHERE id IN ('+tableIds.map(()=>'?').join(',')+')').bind(...tableIds).all()).results;if(existing.length!==tableIds.length||existing.some(t=>t.room_id!==existing[0].room_id)||existing.reduce((n,t)=>n+t.seats,0)<old.party_size)return fail('Tavoli incompatibili');try{await db.batch([db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),...tableIds.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,old.book_date,old.service)),db.prepare("UPDATE reservations SET room_id=?,status='confirmed' WHERE id=?").bind(existing[0].room_id,id)]);return json({ok:true})}catch(e){return fail('Tavoli già occupati: '+e.message)}}}
+if(resource==='reservations'){if(method==='GET'){await ensureOperations(db);const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,GROUP_CONCAT(t.code, ', ') table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);if(b.status==='cancelled'){await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id)]);return json({ok:true})}const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];if(!tableIds.length)return fail('Indica i tavoli da assegnare');const existing=(await db.prepare('SELECT id,room_id,seats FROM tables WHERE id IN ('+tableIds.map(()=>'?').join(',')+')').bind(...tableIds).all()).results;if(existing.length!==tableIds.length||existing.some(t=>t.room_id!==existing[0].room_id)||existing.reduce((n,t)=>n+t.seats,0)<old.party_size)return fail('Tavoli incompatibili');try{await db.batch([db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),...tableIds.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,old.book_date,old.service)),db.prepare("UPDATE reservations SET room_id=?,status='confirmed' WHERE id=?").bind(existing[0].room_id,id)]);return json({ok:true})}catch(e){return fail('Tavoli già occupati: '+e.message)}}}
 if(['menu','gallery'].includes(resource)){const table=resource==='menu'?'menu_items':'gallery';if(method==='GET')return json((await db.prepare(`SELECT * FROM ${table} ORDER BY sort_order,id`).all()).results);if(method==='POST'||method==='PUT'){const fields=table==='menu_items'?['section','category','name','description','price','allergens','image_url','region','winery','vintage','available','sort_order']:['image_url','caption','category','sort_order'];const values=fields.map(k=>['available','sort_order'].includes(k)?Number(b[k]??(k==='available'?1:0)):clean(b[k],k==='description'?1400:600));if(method==='POST'){const r=await db.prepare(`INSERT INTO ${table}(${fields.join(',')}) VALUES(${fields.map(()=>'?').join(',')})`).bind(...values).run();return json({ok:true,id:r.meta.last_row_id})}await db.prepare(`UPDATE ${table} SET ${fields.map(f=>f+'=?').join(',')} WHERE id=?`).bind(...values,Number(parts[2])).run();return json({ok:true})}if(method==='DELETE'){await db.prepare(`DELETE FROM ${table} WHERE id=?`).bind(Number(parts[2])).run();return json({ok:true})}}
 if(resource==='upload'&&method==='POST'){if(!ctx.env.MEDIA)return fail('Bucket R2 non configurato',503);const form=await ctx.request.formData(),file=form.get('file');if(!file||typeof file==='string'||!file.type.startsWith('image/')||file.size>7*1024*1024)return fail('Carica un’immagine valida fino a 7MB');const ext=({ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'})[file.type];if(!ext)return fail('Formato non supportato');const key=rand()+'.'+ext;await ctx.env.MEDIA.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type}});return json({url:'/api/media/'+key})}
 return fail('Rotta non trovata',404)}
