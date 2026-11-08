@@ -1,3 +1,4 @@
+import {eventsAdmin} from './phase4.js';
 import {ensurePhase2,syncCustomer,alertStaff,emailForBooking,emailStaff,sendEmailRecorded,validEmail} from './phase2.js';
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}});
 const fail=(message,status=400)=>json({error:message},status);
@@ -62,7 +63,14 @@ async function ensureOperations(db){
  await db.prepare(`CREATE TABLE IF NOT EXISTS service_visits(reservation_id INTEGER PRIMARY KEY REFERENCES reservations(id) ON DELETE CASCADE, state TEXT NOT NULL DEFAULT 'expected' CHECK(state IN ('expected','arrived','seated','finished','no_show')), updated_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '')`).run();
  await db.prepare(`CREATE TABLE IF NOT EXISTS service_blocks(id INTEGER PRIMARY KEY AUTOINCREMENT,book_date TEXT NOT NULL,service TEXT NOT NULL CHECK(service IN ('lunch','dinner')),scope TEXT NOT NULL CHECK(scope IN ('service','room','table')),target_id INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,UNIQUE(book_date,service,scope,target_id))`).run();
 }
-async function serviceBlocks(db,date,service){await ensureOperations(db);return (await db.prepare('SELECT * FROM service_blocks WHERE book_date=? AND service=? ORDER BY scope,id').bind(date,service).all()).results||[]}
+async function serviceBlocks(db,date,service){
+ await ensureOperations(db);
+ const [blocks,events]=await Promise.all([
+  db.prepare('SELECT * FROM service_blocks WHERE book_date=? AND service=? ORDER BY scope,id').bind(date,service).all(),
+  db.prepare('SELECT room_id, event_id FROM oasi_event_room_slots WHERE book_date=? AND service=?').bind(date,service).all()
+ ]);
+ return [...(blocks.results||[]),...(events.results||[]).map(x=>({scope:'room',target_id:x.room_id,reason:'Riservata per evento privato',event_id:x.event_id,source:'event'}))];
+}
 async function operationsData(db,date,service){
  await ensureOperations(db);await ensureFloorV3(db);
  const filter=service==='all'?'':' AND r.service=?';const params=service==='all'?[date]:[date,service];
@@ -72,7 +80,9 @@ async function operationsData(db,date,service){
   db.prepare('SELECT t.*,COALESCE(d.min_seats,1) min_seats FROM tables t LEFT JOIN table_details d ON d.table_id=t.id ORDER BY t.room_id,t.id').all(),
   db.prepare("SELECT * FROM service_blocks WHERE book_date=? "+(service==='all'?'':'AND service=? ')+"ORDER BY service,scope,id").bind(...params).all()
  ]);
- return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:blocks.results||[]};
+ const eventRows=await db.prepare('SELECT event_id,room_id,book_date,service FROM oasi_event_room_slots WHERE book_date=? '+(service==='all'?'':'AND service=? ')).bind(...params).all();
+ const eventBlocks=(eventRows.results||[]).map(x=>({id:'event:'+x.event_id+':'+x.room_id,scope:'room',target_id:x.room_id,service:x.service,reason:'Sala riservata per evento privato',event_id:x.event_id,source:'event'}));
+ return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:[...(blocks.results||[]),...eventBlocks]};
 }
 async function candidates(db,roomIds,date,service,party){
  if(!roomIds.length)return [];
@@ -133,7 +143,7 @@ let mailResult={status:'unconfigured'};
 try{await syncCustomer(db,booking);await alertStaff(db,id,'new','Nuova prenotazione #'+id,`${d} ${svc==='lunch'?'Pranzo':'Cena'} · ${tm} · ${name} · ${party} persone`)}catch(e){console.error('Oasi fase2 post-book',e)}
 try{mailResult=await emailForBooking(ctx,booking,'confirm',cancellation);await emailStaff(ctx,booking,'new')}catch(e){console.error('Oasi email confirm',e)}
 return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_status:mailResult.status,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)};
-}catch(e){lastError=e;if(!String(e).includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
+}catch(e){lastError=e;const detail=String(e);if(detail.includes('oasi_event_room_reserved')){if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length)throw Error('Sala riservata per evento: scegli altri tavoli o un altro servizio.');continue}if(!detail.includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
 async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
  // Accesso unico: l'utente inserisce solo la password impostata come Secret su Cloudflare.
  const configuredPass=ctx.env.ADMIN_PASSWORD;
@@ -162,6 +172,7 @@ async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET
 }
 const user=await currentUser(db,ctx.request);
 if(!user||user.email!=='oasi-admin@internal.invalid')return fail('Accesso richiesto',401);
+if(resource==='events')return eventsAdmin(ctx,parts,method,b);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
 if(resource==='analytics'&&method==='GET'){
