@@ -173,33 +173,35 @@ if(resource==='analytics'&&method==='GET'){
  if(days>366)return fail('Seleziona al massimo 367 giorni per report');
  if(!['all','lunch','dinner'].includes(service)||!Number.isInteger(roomId)||roomId<0)return fail('Filtri non validi');
  await ensureOperations(db);
- const params=[start,end];let clause='r.book_date>=? AND r.book_date<=?';
- if(service!=='all'){clause+=' AND r.service=?';params.push(service)}
- if(roomId){clause+=' AND r.room_id=?';params.push(roomId)}
- const sql=`SELECT r.id,r.book_date,r.service,r.time,r.room_id,r.party_size,r.status,r.source,r.name,r.phone,r.email,
+ const baseQuery=`SELECT r.id,r.book_date,r.service,r.time,r.room_id,r.party_size,r.status,r.source,r.name,r.phone,r.email,
  COALESCE(v.state,'expected') visit_state,
- (SELECT cr.customer_id FROM oasi_customer_reservations cr WHERE cr.reservation_id=r.id) customer_id,
+ (SELECT cr.customer_id FROM oasi_customer_reservations cr WHERE cr.reservation_id=r.id LIMIT 1) customer_id,
  (SELECT GROUP_CONCAT(t.code,', ') FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id WHERE rt.reservation_id=r.id) table_codes
- FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE ${clause}
- ORDER BY r.book_date ASC,r.service ASC,r.time ASC,r.id ASC`;
- const [raw,rs]=await Promise.all([db.prepare(sql).bind(...params).all(),db.prepare('SELECT id,name FROM rooms ORDER BY sort_order,id').all()]);
- const rooms=rs.results||[];
- const rows=(raw.results||[]).map(r=>({...r,room_name:rooms.find(z=>z.id===r.room_id)?.name||'Sala non specificata'}));
- const count=rows.filter(r=>r.status==='confirmed');
- const visits=count.filter(r=>['seated','finished'].includes(r.visit_state)&&r.book_date<=today());
- const visitCounts=new Map();for(const r of visits){if(r.customer_id)visitCounts.set(r.customer_id,(visitCounts.get(r.customer_id)||0)+1)}
- const repeat_customers=[...visitCounts.values()].filter(n=>n>=2).length;
- const cancellations=rows.filter(r=>r.status==='cancelled');
- const noShows=count.filter(r=>r.visit_state==='no_show');
- const dayMap=new Map(),services={lunch:{bookings:0,covers:0,visits:0},dinner:{bookings:0,covers:0,visits:0}},roomsMap=new Map(),sources={web:0,staff:0,other:0};
- for(const row of rows){const active=row.status==='confirmed',real=active&&['seated','finished'].includes(row.visit_state)&&row.book_date<=today();
-  const d=dayMap.get(row.book_date)||{date:row.book_date,bookings:0,covers:0,visits:0,cancelled:0,no_show:0};
-  if(active){d.bookings++;d.covers+=row.party_size;const svc=services[row.service];if(svc){svc.bookings++;svc.covers+=row.party_size;if(real)svc.visits++}sources[row.source==='web'?'web':row.source==='staff'?'staff':'other']++}
-  if(real)d.visits++;if(!active)d.cancelled++;if(active&&row.visit_state==='no_show')d.no_show++;dayMap.set(row.book_date,d);
-  const room=roomsMap.get(row.room_id)||{id:row.room_id,name:row.room_name,bookings:0,covers:0,visits:0};
-  if(active){room.bookings++;room.covers+=row.party_size;if(real)room.visits++}roomsMap.set(row.room_id,room);
+ FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE `;
+ const getRows=async(from,to)=>{const args=[from,to];let clause='r.book_date>=? AND r.book_date<=?';if(service!=='all'){clause+=' AND r.service=?';args.push(service)}if(roomId){clause+=' AND r.room_id=?';args.push(roomId)}return (await db.prepare(baseQuery+clause+' ORDER BY r.book_date,r.service,r.time,r.id').bind(...args).all()).results||[]};
+ const shift=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+ const previous={start:shift(start,-(days+1)),end:shift(start,-1)};
+ const [original,prior,rs]=await Promise.all([getRows(start,end),getRows(previous.start,previous.end),db.prepare('SELECT id,name FROM rooms ORDER BY sort_order,id').all()]);
+ const rooms=rs.results||[];const roomName=id=>rooms.find(z=>Number(z.id)===Number(id))?.name||'Sala non specificata';
+ const rows=original.map(r=>({...r,room_name:roomName(r.room_id)}));
+ const currentDay=today();const isVisit=r=>r.status==='confirmed'&&['seated','finished'].includes(r.visit_state)&&r.book_date<=currentDay;
+ const summarize=records=>{const valid=records.filter(r=>r.status==='confirmed'),visits=valid.filter(isVisit),cancelled=records.filter(r=>r.status==='cancelled');return {bookings:valid.length,covers:valid.reduce((n,r)=>n+Number(r.party_size||0),0),visits:visits.length,visited_covers:visits.reduce((n,r)=>n+Number(r.party_size||0),0),cancelled:cancelled.length,no_show:valid.filter(r=>r.visit_state==='no_show').length,avg_party:valid.length?Number((valid.reduce((n,r)=>n+Number(r.party_size||0),0)/valid.length).toFixed(1)):0}};
+ const summary=summarize(rows),previousSummary=summarize(prior);
+ const visits=rows.filter(isVisit);const visitCounts=new Map();for(const r of visits){if(r.customer_id)visitCounts.set(r.customer_id,(visitCounts.get(r.customer_id)||0)+1)}
+ summary.repeat_customers=[...visitCounts.values()].filter(n=>n>=2).length;
+ const services={lunch:{bookings:0,covers:0,visits:0},dinner:{bookings:0,covers:0,visits:0}},roomsMap=new Map(),sources={web:0,staff:0,other:0},hourMap=new Map();
+ const dayMap=new Map();for(let i=0;i<=days;i++){const date=shift(start,i);dayMap.set(date,{date,bookings:0,covers:0,visits:0,visited_covers:0,cancelled:0,no_show:0})}
+ for(const row of rows){const active=row.status==='confirmed',real=isVisit(row),covers=Number(row.party_size||0),d=dayMap.get(row.book_date);if(!d)continue;
+  if(active){d.bookings++;d.covers+=covers;const svc=services[row.service];if(svc){svc.bookings++;svc.covers+=covers;if(real)svc.visits++}sources[row.source==='web'?'web':row.source==='staff'?'staff':'other']++;
+   const hour=String(row.time||'').slice(0,2);if(/^\d{2}$/.test(hour))hourMap.set(hour,(hourMap.get(hour)||0)+1);
+  }
+  if(real){d.visits++;d.visited_covers+=covers}if(row.status==='cancelled')d.cancelled++;if(active&&row.visit_state==='no_show')d.no_show++;
+  const room=roomsMap.get(row.room_id)||{id:row.room_id,name:row.room_name,bookings:0,covers:0,visits:0};if(active){room.bookings++;room.covers+=covers;if(real)room.visits++}roomsMap.set(row.room_id,room);
  }
- return json({range:{start,end,service,room:roomId},summary:{bookings:count.length,covers:count.reduce((a,r)=>a+Number(r.party_size||0),0),visits:visits.length,visited_covers:visits.reduce((a,r)=>a+Number(r.party_size||0),0),cancelled:cancellations.length,no_show:noShows.length,avg_party:count.length?Number((count.reduce((a,r)=>a+Number(r.party_size||0),0)/count.length).toFixed(1)):0,repeat_customers},days:[...dayMap.values()].sort((a,b)=>a.date.localeCompare(b.date)),services,rooms:[...roomsMap.values()].sort((a,b)=>b.covers-a.covers),sources,room_options:rooms,rows});
+ const dayRows=[...dayMap.values()];
+ const monthly=new Map();for(const d of dayRows){const month=d.date.slice(0,7);const m=monthly.get(month)||{date:month,bookings:0,covers:0,visits:0,visited_covers:0,cancelled:0,no_show:0};for(const k of ['bookings','covers','visits','visited_covers','cancelled','no_show'])m[k]+=d[k];monthly.set(month,m)}
+ const weekdayNames=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];const weekdays=weekdayNames.map(name=>({name,bookings:0,covers:0,visits:0}));for(const d of dayRows){const idx=new Date(d.date+'T12:00:00Z').getUTCDay();weekdays[idx].bookings+=d.bookings;weekdays[idx].covers+=d.covers;weekdays[idx].visits+=d.visits}
+ return json({range:{start,end,service,room:roomId},previous_range:previous,summary,previous_summary:previousSummary,days:dayRows,months:[...monthly.values()],weekdays,peak_hours:[...hourMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([hour,bookings])=>({hour:hour+':00',bookings})),services,rooms:[...roomsMap.values()].filter(r=>r.bookings).sort((a,b)=>b.covers-a.covers),sources,room_options:rooms,rows});
 }
 if(resource==='customers'){
  await ensurePhase2(db);
