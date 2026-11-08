@@ -167,16 +167,34 @@ if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('c
 if(resource==='customers'){
  await ensurePhase2(db);
  if(method==='GET'){
-  const q=clean(new URL(ctx.request.url).searchParams.get('q')||'',100);
-  const results=await db.prepare(`SELECT c.*,COUNT(r.id) total_bookings,SUM(CASE WHEN r.status='confirmed' THEN 1 ELSE 0 END) active_bookings,MAX(r.book_date) last_booking FROM oasi_customers c LEFT JOIN reservations r ON lower(r.email)=lower(c.email) WHERE (?='' OR c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?) GROUP BY c.id ORDER BY COALESCE(last_booking,'') DESC,c.name LIMIT 250`).bind(q,'%'+q+'%','%'+q+'%','%'+q+'%').all();
-  return json(results.results||[])
+  const url=new URL(ctx.request.url),q=clean(url.searchParams.get('q')||'',100);
+  const lookup=url.searchParams.get('lookup')==='1';
+  if(lookup){
+   const mail=clean(url.searchParams.get('email')||'',180).toLowerCase();
+   const digits=String(url.searchParams.get('phone')||'').replace(/\D/g,'').slice(-15);
+   if(!mail&&!digits)return json([]);
+   const sql=`SELECT id,name,email,phone FROM oasi_customers WHERE (?<>'' AND lower(email)=?) OR (?<>'' AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone,' ',''),'+',''),'-',''),'(',''),')','') LIKE ?) ORDER BY CASE WHEN lower(email)=? THEN 0 ELSE 1 END,id LIMIT 8`;
+   const found=await db.prepare(sql).bind(mail,mail,digits,'%'+digits,mail).all();
+   return json(found.results||[]);
+  }
+  const sql=`SELECT c.*,
+   (SELECT COUNT(*) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id WHERE cr.customer_id=c.id) total_bookings,
+   (SELECT COUNT(*) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=c.id AND r.status='confirmed' AND COALESCE(v.state,'expected') IN ('seated','finished') AND r.book_date<=?) actual_visits,
+   (SELECT MAX(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id WHERE cr.customer_id=c.id) last_booking,
+   (SELECT MAX(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=c.id AND r.status='confirmed' AND COALESCE(v.state,'expected') IN ('seated','finished') AND r.book_date<=?) last_visit,
+   (SELECT MIN(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id WHERE cr.customer_id=c.id AND r.status='confirmed' AND r.book_date>=?) next_booking
+   FROM oasi_customers c WHERE (?='' OR c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?) ORDER BY COALESCE(last_booking,'') DESC,c.name LIMIT 250`;
+  const results=await db.prepare(sql).bind(today(),today(),today(),q,'%'+q+'%','%'+q+'%','%'+q+'%').all();
+  return json(results.results||[]);
  }
  if(method==='PATCH'){
   const id=Number(parts[2]);if(!Number.isInteger(id)||id<1)return fail('Cliente non valido');
   const row=await db.prepare('SELECT * FROM oasi_customers WHERE id=?').bind(id).first();if(!row)return fail('Cliente non trovato',404);
-  const name=clean(b.name,120),phone=clean(b.phone,40),staff_note=clean(b.staff_note,500);
-  if(!name||!phone)return fail('Nome e telefono obbligatori');
-  await db.prepare('UPDATE oasi_customers SET name=?,phone=?,staff_note=?,updated_at=? WHERE id=?').bind(name,phone,staff_note,now(),id).run();return json({ok:true})
+  const name=clean(b.name,120),phone=clean(b.phone,40),email=clean(b.email,180).toLowerCase(),staff_note=clean(b.staff_note,500);
+  if(!name||!phone||!validEmail(email))return fail('Nome, telefono ed email valida sono obbligatori');
+  const other=await db.prepare('SELECT id FROM oasi_customers WHERE email=? AND id<>?').bind(email,id).first();
+  if(other)return fail('Email già associata a un altro cliente. Verifica la scheda, non creare duplicati.',409);
+  await db.prepare('UPDATE oasi_customers SET name=?,phone=?,email=?,staff_note=?,updated_at=? WHERE id=?').bind(name,phone,email,staff_note,now(),id).run();return json({ok:true})
  }
  if(method==='DELETE'){
   const id=Number(parts[2]);await db.prepare('DELETE FROM oasi_customers WHERE id=?').bind(id).run();return json({ok:true,note:'Le prenotazioni restano conservate secondo le regole di gestione.'})
@@ -186,12 +204,25 @@ if(resource==='customers'){
 if(resource==='customer-history'&&method==='GET'){
  await ensurePhase2(db);const id=Number(parts[2]),customer=await db.prepare('SELECT * FROM oasi_customers WHERE id=?').bind(id).first();
  if(!customer)return fail('Cliente non trovato',404);
- const result=await db.prepare(`SELECT r.id,r.book_date,r.service,r.time,r.party_size,r.status,r.source,COALESCE(v.state,'expected') visit_state,GROUP_CONCAT(t.code,', ') table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE lower(r.email)=lower(?) GROUP BY r.id ORDER BY r.book_date DESC,r.time DESC LIMIT 120`).bind(customer.email).all();
- return json({customer,bookings:result.results||[]})
+ const sql=`SELECT r.id,r.book_date,r.service,r.time,r.party_size,r.status,r.source,COALESCE(v.state,'expected') visit_state,
+ (SELECT GROUP_CONCAT(t.code,', ') FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id WHERE rt.reservation_id=r.id) table_codes
+ FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=? ORDER BY r.book_date DESC,r.time DESC LIMIT 200`;
+ const result=await db.prepare(sql).bind(id).all();
+ const bookings=result.results||[];
+ const stats=await db.prepare(`SELECT COUNT(*) bookings,
+ SUM(CASE WHEN r.status='confirmed' AND r.book_date<=? AND COALESCE(v.state,'expected') IN ('seated','finished') THEN 1 ELSE 0 END) visits,
+ SUM(CASE WHEN r.status='cancelled' THEN 1 ELSE 0 END) cancelled,
+ SUM(CASE WHEN COALESCE(v.state,'expected')='no_show' THEN 1 ELSE 0 END) no_shows,
+ MAX(CASE WHEN r.status='confirmed' AND r.book_date<=? AND COALESCE(v.state,'expected') IN ('seated','finished') THEN r.book_date END) last_visit
+ FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=?`).bind(today(),today(),id).first();
+ return json({customer,bookings,stats:stats||{}})
 }
 if(resource==='notifications'){
  await ensurePhase2(db);
- if(method==='GET')return json((await db.prepare('SELECT * FROM oasi_staff_notifications ORDER BY created_at DESC,id DESC LIMIT 100').all()).results||[]);
+ if(method==='GET'){
+  if(new URL(ctx.request.url).searchParams.get('count')==='1'){const found=await db.prepare('SELECT COUNT(*) unread FROM oasi_staff_notifications WHERE seen=0').first();return json({unread:Number(found?.unread||0)})}
+  const found=await db.prepare(`SELECT n.*,r.book_date,r.service FROM oasi_staff_notifications n LEFT JOIN reservations r ON r.id=n.reservation_id ORDER BY n.created_at DESC,n.id DESC LIMIT 100`).all();return json(found.results||[]);
+ }
  if(method==='PATCH'){const id=Number(parts[2]);if(!Number.isInteger(id)||id<1)return fail('ID non valido');await db.prepare('UPDATE oasi_staff_notifications SET seen=1 WHERE id=?').bind(id).run();return json({ok:true})}
  if(method==='POST'&&parts[2]==='mark-all'){await db.prepare('UPDATE oasi_staff_notifications SET seen=1 WHERE seen=0').run();return json({ok:true})}
  return fail('Metodo non consentito',405)

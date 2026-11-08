@@ -6,6 +6,8 @@ export const validEmail=s=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s||''))&&Str
 export async function ensurePhase2(db){
  await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_customers(id INTEGER PRIMARY KEY AUTOINCREMENT,email TEXT NOT NULL COLLATE NOCASE UNIQUE,name TEXT NOT NULL,phone TEXT NOT NULL,staff_note TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`).run();
  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_customers_phone ON oasi_customers(phone)`).run();
+ await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_customer_reservations(reservation_id INTEGER PRIMARY KEY REFERENCES reservations(id) ON DELETE CASCADE, customer_id INTEGER NOT NULL REFERENCES oasi_customers(id) ON DELETE CASCADE)`).run();
+ await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_customer_res_customer ON oasi_customer_reservations(customer_id)`).run();
  await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_email_log(id INTEGER PRIMARY KEY AUTOINCREMENT,event_key TEXT NOT NULL UNIQUE,reservation_id INTEGER REFERENCES reservations(id) ON DELETE SET NULL,recipient TEXT NOT NULL,email_type TEXT NOT NULL,subject TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','sent','failed','unconfigured')) DEFAULT 'pending',error TEXT NOT NULL DEFAULT '',provider_id TEXT NOT NULL DEFAULT '',attempted_at TEXT,created_at TEXT NOT NULL)`).run();
  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_email_log_reservation ON oasi_email_log(reservation_id,created_at)`).run();
  await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_staff_notifications(id INTEGER PRIMARY KEY AUTOINCREMENT,reservation_id INTEGER REFERENCES reservations(id) ON DELETE SET NULL,event_type TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,seen INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL)`).run();
@@ -14,7 +16,21 @@ export async function ensurePhase2(db){
 export async function syncCustomer(db,booking){
  const mail=clean(booking.email,180).toLowerCase();if(!validEmail(mail))return;
  await ensurePhase2(db);
- await db.prepare(`INSERT INTO oasi_customers(email,name,phone,created_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,phone=excluded.phone,updated_at=excluded.updated_at`).bind(mail,clean(booking.name,120),clean(booking.phone,40),timestamp(),timestamp()).run();
+ const linked=booking.id?await db.prepare(`SELECT c.* FROM oasi_customer_reservations cr JOIN oasi_customers c ON c.id=cr.customer_id WHERE cr.reservation_id=?`).bind(booking.id).first():null;
+ let customer=linked||await db.prepare(`SELECT * FROM oasi_customers WHERE email=?`).bind(mail).first();
+ const name=clean(booking.name,120),phone=clean(booking.phone,40),when=timestamp();
+ if(linked){
+  const collision=await db.prepare(`SELECT id FROM oasi_customers WHERE email=? AND id<>?`).bind(mail,linked.id).first();
+  if(collision){ // Don't fuse two customer identities when an existing reservation's email changes.
+   await db.prepare(`UPDATE oasi_customers SET name=?,phone=?,updated_at=? WHERE id=?`).bind(name,phone,when,linked.id).run();
+  }else await db.prepare(`UPDATE oasi_customers SET email=?,name=?,phone=?,updated_at=? WHERE id=?`).bind(mail,name,phone,when,linked.id).run();
+ }else if(customer){
+  await db.prepare(`UPDATE oasi_customers SET name=?,phone=?,updated_at=? WHERE id=?`).bind(name,phone,when,customer.id).run();
+ }else{
+  await db.prepare(`INSERT INTO oasi_customers(email,name,phone,created_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,phone=excluded.phone,updated_at=excluded.updated_at`).bind(mail,name,phone,when,when).run();
+  customer=await db.prepare(`SELECT id FROM oasi_customers WHERE email=?`).bind(mail).first();
+ }
+ if(booking.id&&customer){await db.prepare(`INSERT INTO oasi_customer_reservations(reservation_id,customer_id) VALUES(?,?) ON CONFLICT(reservation_id) DO UPDATE SET customer_id=excluded.customer_id`).bind(Number(booking.id),Number(customer.id)).run()}
 }
 export async function alertStaff(db,reservationId,eventType,title,message){
  await ensurePhase2(db);
