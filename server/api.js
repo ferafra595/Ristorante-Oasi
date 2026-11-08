@@ -67,9 +67,18 @@ async function serviceBlocks(db,date,service){
  await ensureOperations(db);
  const [blocks,events]=await Promise.all([
   db.prepare('SELECT * FROM service_blocks WHERE book_date=? AND service=? ORDER BY scope,id').bind(date,service).all(),
-  db.prepare('SELECT room_id, event_id FROM oasi_event_room_slots WHERE book_date=? AND service=?').bind(date,service).all()
+  db.prepare("SELECT er.room_id, e.id event_id FROM oasi_event_rooms er JOIN oasi_private_events e ON e.id=er.event_id WHERE e.status<>'cancelled' AND ? BETWEEN e.start_date AND e.end_date AND (e.service='both' OR e.service=?)").bind(date,service).all()
  ]);
  return [...(blocks.results||[]),...(events.results||[]).map(x=>({scope:'room',target_id:x.room_id,reason:'Riservata per evento privato',event_id:x.event_id,source:'event'}))];
+}
+// Fonte autorevole: date/servizi/sale della cerimonia, indipendente dagli slot materializzati.
+async function eventRoomBlocked(db,date,service,roomId){
+ const row=await db.prepare(`SELECT e.id,e.title FROM oasi_private_events e
+ JOIN oasi_event_rooms er ON er.event_id=e.id
+ WHERE er.room_id=? AND e.status<>'cancelled'
+ AND ? BETWEEN e.start_date AND e.end_date
+ AND (e.service='both' OR e.service=?) LIMIT 1`).bind(roomId,date,service).first();
+ return row;
 }
 async function operationsData(db,date,service){
  await ensureOperations(db);await ensureFloorV3(db);
@@ -80,8 +89,12 @@ async function operationsData(db,date,service){
   db.prepare('SELECT t.*,COALESCE(d.min_seats,1) min_seats FROM tables t LEFT JOIN table_details d ON d.table_id=t.id ORDER BY t.room_id,t.id').all(),
   db.prepare("SELECT * FROM service_blocks WHERE book_date=? "+(service==='all'?'':'AND service=? ')+"ORDER BY service,scope,id").bind(...params).all()
  ]);
- const eventRows=await db.prepare('SELECT event_id,room_id,book_date,service FROM oasi_event_room_slots WHERE book_date=? '+(service==='all'?'':'AND service=? ')).bind(...params).all();
- const eventBlocks=(eventRows.results||[]).map(x=>({id:'event:'+x.event_id+':'+x.room_id,scope:'room',target_id:x.room_id,service:x.service,reason:'Sala riservata per evento privato',event_id:x.event_id,source:'event'}));
+ const eventRows=await db.prepare(`SELECT e.id event_id,er.room_id,e.service event_service
+ FROM oasi_event_rooms er JOIN oasi_private_events e ON e.id=er.event_id
+ WHERE e.status<>'cancelled' AND ? BETWEEN e.start_date AND e.end_date
+ AND (?='all' OR e.service='both' OR e.service=?)`).bind(date,service,service).all();
+ const eventBlocks=(eventRows.results||[]).flatMap(x=>(x.event_service==='both'?['lunch','dinner']:[x.event_service])
+  .filter(s=>service==='all'||service===s).map(s=>({id:'event:'+x.event_id+':'+x.room_id+':'+s,scope:'room',target_id:x.room_id,service:s,reason:'Sala riservata per evento privato',event_id:x.event_id,source:'event'})));
  return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:[...(blocks.results||[]),...eventBlocks]};
 }
 async function candidates(db,roomIds,date,service,party){
@@ -137,13 +150,13 @@ if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length){
  if(!explicit)throw Error('Uno o più tavoli sono occupati, bloccati, in altra sala o non adatti alla capienza richiesta.');
  opts=[explicit]; // Never silently assign different tables when staff requested exact IDs.
 }else{opts=await candidates(db,usable,d,svc,party)}
-if(!opts.length)throw Error('Nessun tavolo disponibile per questo numero di persone');const token=rand(),hashed=await digest(token);let lastError;for(const o of opts){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert]);const id=seq[0].meta.last_row_id;try{await db.batch(o.ids.map(tid=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,tid,d,svc)))}catch(e){await db.prepare('DELETE FROM reservations WHERE id=?').bind(id).run();throw e}const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;
+if(!opts.length)throw Error('Nessun tavolo disponibile per questo numero di persone');const token=rand(),hashed=await digest(token);let lastError;for(const o of opts){try{if(await eventRoomBlocked(db,d,svc,o.room_id)){if(admin)throw Error('Sala riservata per evento privato per questo servizio. Non è possibile creare la prenotazione.');continue}const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert]);const id=seq[0].meta.last_row_id;try{await db.batch(o.ids.map(tid=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,tid,d,svc)))}catch(e){await db.prepare('DELETE FROM reservations WHERE id=?').bind(id).run();throw e}const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;
 const booking={id,book_date:d,service:svc,time:tm,party_size:party,name,phone,email:mail,source:admin?'staff':'web'};
 let mailResult={status:'unconfigured'};
 try{await syncCustomer(db,booking);await alertStaff(db,id,'new','Nuova prenotazione #'+id,`${d} ${svc==='lunch'?'Pranzo':'Cena'} · ${tm} · ${name} · ${party} persone`)}catch(e){console.error('Oasi fase2 post-book',e)}
 try{mailResult=await emailForBooking(ctx,booking,'confirm',cancellation);await emailStaff(ctx,booking,'new')}catch(e){console.error('Oasi email confirm',e)}
 return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_status:mailResult.status,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)};
-}catch(e){lastError=e;const detail=String(e);if(detail.includes('oasi_event_room_reserved')){if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length)throw Error('Sala riservata per evento: scegli altri tavoli o un altro servizio.');continue}if(!detail.includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
+}catch(e){lastError=e;const detail=String(e);if(detail.includes('oasi_event_room_reserved')){if(admin)throw Error('Sala riservata per evento: scegli una sala libera o un altro servizio.');continue}if(!detail.includes('UNIQUE constraint failed'))throw e}}throw Error('Disponibilità appena esaurita. Aggiorna e riprova. '+(lastError?'':''))}
 async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
  // Accesso unico: l'utente inserisce solo la password impostata come Secret su Cloudflare.
  const configuredPass=ctx.env.ADMIN_PASSWORD;
@@ -427,7 +440,7 @@ if(resource==='reservations'){if(method==='GET'){await ensureOperations(db);cons
  if(old.status==='cancelled')return json({ok:true,already:true});
  await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=?").bind(id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id)]);
  let mailStatus='unconfigured';try{await alertStaff(db,id,'cancel','Prenotazione annullata #'+id,`${old.book_date} · ${old.name}`);mailStatus=(await emailForBooking(ctx,old,'cancel')).status;await emailStaff(ctx,old,'cancel')}catch(e){console.error('Oasi cancel',e)}return json({ok:true,email_status:mailStatus});
-}const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];if(!tableIds.length)return fail('Indica i tavoli da assegnare');const existing=(await db.prepare('SELECT id,room_id,seats FROM tables WHERE id IN ('+tableIds.map(()=>'?').join(',')+')').bind(...tableIds).all()).results;if(existing.length!==tableIds.length||existing.some(t=>t.room_id!==existing[0].room_id)||existing.reduce((n,t)=>n+t.seats,0)<old.party_size)return fail('Tavoli incompatibili');try{await db.batch([db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),...tableIds.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,old.book_date,old.service)),db.prepare("UPDATE reservations SET room_id=?,status='confirmed' WHERE id=?").bind(existing[0].room_id,id)]);return json({ok:true})}catch(e){return fail('Tavoli già occupati: '+e.message)}}}
+}const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];if(!tableIds.length)return fail('Indica i tavoli da assegnare');const existing=(await db.prepare('SELECT id,room_id,seats FROM tables WHERE id IN ('+tableIds.map(()=>'?').join(',')+')').bind(...tableIds).all()).results;if(existing.length!==tableIds.length||existing.some(t=>t.room_id!==existing[0].room_id)||existing.reduce((n,t)=>n+t.seats,0)<old.party_size)return fail('Tavoli incompatibili');if(await eventRoomBlocked(db,old.book_date,old.service,existing[0].room_id))return fail('Sala riservata per evento: impossibile spostare qui la prenotazione.',409);try{await db.batch([db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),...tableIds.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,old.book_date,old.service)),db.prepare("UPDATE reservations SET room_id=?,status='confirmed' WHERE id=?").bind(existing[0].room_id,id)]);return json({ok:true})}catch(e){return fail(String(e.message).includes('oasi_event_room_reserved')?'Sala riservata per evento: spostamento non consentito.':'Tavoli già occupati: '+e.message,409)}}}
 if(['menu','gallery'].includes(resource)){const table=resource==='menu'?'menu_items':'gallery';if(method==='GET')return json((await db.prepare(`SELECT * FROM ${table} ORDER BY sort_order,id`).all()).results);if(method==='POST'||method==='PUT'){const fields=table==='menu_items'?['section','category','name','description','price','allergens','image_url','region','winery','vintage','available','sort_order']:['image_url','caption','category','sort_order'];const values=fields.map(k=>['available','sort_order'].includes(k)?Number(b[k]??(k==='available'?1:0)):clean(b[k],k==='description'?1400:600));if(method==='POST'){const r=await db.prepare(`INSERT INTO ${table}(${fields.join(',')}) VALUES(${fields.map(()=>'?').join(',')})`).bind(...values).run();return json({ok:true,id:r.meta.last_row_id})}await db.prepare(`UPDATE ${table} SET ${fields.map(f=>f+'=?').join(',')} WHERE id=?`).bind(...values,Number(parts[2])).run();return json({ok:true})}if(method==='DELETE'){await db.prepare(`DELETE FROM ${table} WHERE id=?`).bind(Number(parts[2])).run();return json({ok:true})}}
 if(resource==='upload'&&method==='POST'){if(!ctx.env.MEDIA)return fail('Bucket R2 non configurato',503);const form=await ctx.request.formData(),file=form.get('file');if(!file||typeof file==='string'||!file.type.startsWith('image/')||file.size>7*1024*1024)return fail('Carica un’immagine valida fino a 7MB');const ext=({ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'})[file.type];if(!ext)return fail('Formato non supportato');const key=rand()+'.'+ext;await ctx.env.MEDIA.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type}});return json({url:'/api/media/'+key})}
 return fail('Rotta non trovata',404)}
