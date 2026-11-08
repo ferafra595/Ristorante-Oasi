@@ -1,6 +1,7 @@
 import {eventsAdmin} from './phase4.js';
+import {auditAction,securityRoute,loginGuard,recordLogin,verifyAdminOrigin} from './phase5.js';
 import {ensurePhase2,syncCustomer,alertStaff,emailForBooking,emailStaff,sendEmailRecorded,validEmail} from './phase2.js';
-const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}});
+const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer',...headers}});
 const fail=(message,status=400)=>json({error:message},status);
 const now=()=>new Date().toISOString();
 const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'});
@@ -21,7 +22,7 @@ const dateOk=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:0
 const timeOk=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
 const weekday=d=>new Date(d+'T12:00:00Z').getUTCDay();
 const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5));
-const cookie=(token,secure)=>`oasi_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure?'; Secure':''}`;
+const cookie=(token,secure)=>`oasi_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${secure?'; Secure':''}`;
 async function currentUser(db,req){const token=(req.headers.get('cookie')||'').match(/(?:^|; )oasi_session=([a-f0-9]{64})/)?.[1];if(!token)return null;return db.prepare('SELECT users.id,users.email FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.token_hash=? AND sessions.expires_at>?').bind(await digest(token),now()).first()}
 const clean=(s,n=1000)=>String(s??'').trim().slice(0,n);
 
@@ -229,7 +230,10 @@ async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET
  const configuredPass=ctx.env.ADMIN_PASSWORD;
  if(typeof configuredPass!=='string'||configuredPass.length===0)return fail('Configurazione ADMIN incompleta: aggiungi ADMIN_PASSWORD come Secret di produzione su Cloudflare',503);
  const supplied=String(b.password||'');
- if(!supplied||!(await equalSecret(supplied,configuredPass)))return fail('Password non valida',401);
+ const allowed=await loginGuard(db,ctx.request);
+ if(!allowed)return fail('Troppi tentativi di accesso. Riprova tra 15 minuti.',429);
+ if(!supplied||!(await equalSecret(supplied,configuredPass))){await recordLogin(db,ctx.request,false);return fail('Password non valida',401)}
+ await recordLogin(db,ctx.request,true);
  const internalEmail='oasi-admin@internal.invalid'; // solo identificatore tecnico D1, non email di accesso
  // Deriva una sola volta una nuova impronta compatibile con Cloudflare (max 100.000 iterazioni).
  // Il segreto di Cloudflare e' gia' stato verificato: non occorre ricalcolare la password
@@ -246,12 +250,14 @@ async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET
  const row=await db.prepare('SELECT id FROM users WHERE email=?').bind(internalEmail).first();
  // Un solo account autorizzato: le vecchie sessioni email non danno accesso all'ADMIN.
  await db.prepare('DELETE FROM sessions WHERE user_id<>?').bind(row.id).run();
- const token=rand(),exp=new Date(Date.now()+7*86400000).toISOString();
+ const token=rand(),exp=new Date(Date.now()+86400000).toISOString();
+ await db.prepare('DELETE FROM sessions WHERE expires_at<?').bind(now()).run();
  await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await digest(token),row.id,exp).run();
  return json({ok:true},200,{'set-cookie':cookie(token,new URL(ctx.request.url).protocol==='https:')});
 }
 const user=await currentUser(db,ctx.request);
 if(!user||user.email!=='oasi-admin@internal.invalid')return fail('Accesso richiesto',401);
+if(resource==='security')return securityRoute(ctx,parts,method,b,user);
 if(resource==='events')return eventsAdmin(ctx,parts,method,b);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
@@ -513,7 +519,20 @@ if(resource==='upload'&&method==='POST'){if(!ctx.env.MEDIA)return fail('Bucket R
 return fail('Rotta non trovata',404)}
 export async function onRequest(ctx){try{const url=new URL(ctx.request.url),parts=url.pathname.replace(/^\/api\/?/,'').split('/').filter(Boolean),method=ctx.request.method,db=ctx.env.DB;if(parts[0]==='admin'&&parts[1]==='status'&&method==='GET')return json({ok:true,api:true,database:!!ctx.env.DB,password_configured:typeof ctx.env.ADMIN_PASSWORD==='string'&&ctx.env.ADMIN_PASSWORD.length>0});if(!ctx.env.DB)return fail('Database D1 non configurato',503);if(parts[0]==='media'&&method==='GET'){if(!ctx.env.MEDIA)return fail('Bucket non configurato',503);const obj=await ctx.env.MEDIA.get(parts[1]);if(!obj)return fail('Immagine non trovata',404);return new Response(obj.body,{headers:{'content-type':obj.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=86400'}})}
 if(parts[0]==='setup')return fail('Configurazione iniziale disabilitata: usa ADMIN_PASSWORD',404);
-if(parts[0]==='admin')return adminRoute(ctx,parts,method);
+if(parts[0]==='admin'){
+ // Le mutazioni ADMIN richiedono richieste provenienti dallo stesso sito.
+ if(!['GET','HEAD','OPTIONS'].includes(method)&&!verifyAdminOrigin(ctx.request))return fail('Richiesta non autorizzata: origine non valida',403);
+ const response=await adminRoute(ctx,parts,method);
+ // Scrive solo l'operazione eseguita e l'ID risorsa; mai nomi, telefoni o contenuti.
+ if(!['GET','HEAD','OPTIONS'].includes(method)&&parts[1]!=='login'&&parts[1]!=='security'&&response.status<400){
+  const user=await currentUser(db,ctx.request);
+  if(user&&user.email==='oasi-admin@internal.invalid'){
+   const job=auditAction(db,method,parts,response.status,ctx.request);
+   if(ctx.waitUntil)ctx.waitUntil(job);else await job;
+  }
+ }
+ return response;
+}
 if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=await Promise.all([config(db,'site'),config(db,'booking'),db.prepare('SELECT id,name,public_enabled FROM rooms ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM menu_items WHERE available=1 ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM gallery ORDER BY sort_order,id').all()]);return json({site,booking,rooms:rooms.results,menu:menu.results,gallery:gallery.results,email_enabled:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)})}
 if(parts[0]==='availability'&&method==='GET'){const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await candidates(db,state.ids,state.d,state.svc,state.party);return json({available:options.length>0,message:options.length?'':await bookingUnavailableReason(db,state.ids,state.d,state.svc,state.party,false),rooms:(await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1').all()).results.filter(r=>options.some(o=>o.room_id===r.id))})}
 if(parts[0]==='book'&&method==='POST'){try{return json(await saveBooking(ctx,await read(ctx.request),false),201)}catch(e){return fail(e.message||'Impossibile registrare la prenotazione',409)}}
