@@ -268,3 +268,36 @@ a:hover .oasi-arrow{transform:translate(2px,-3px)}
 .floor-mode-expanded .floor-close-large{display:block}
 @media(max-width:760px){.floor-board-scroll{max-height:70vh}.floor-mode-expanded .floor-expanded .floor-board-scroll{max-height:calc(100dvh - 105px)}.floor-canvas-panel{padding:12px!important}}
 @media print{.floor-mode-expanded{overflow:visible}.floor-close-large,.floor-table-resize{display:none!important}.floor-board{width:1100px!important;height:700px!important;min-width:1100px!important;min-height:700px!important;zoom:.7;margin:0 auto}.floor-canvas-panel{position:static!important;overflow:visible!important}}
+
+/* V7 – Pannello proprietà contestuale: senza scorrimento su e giù */
+body.floor-panel-open{overflow:hidden}
+.floor-inspector-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(36,30,24,.22);border:0;border-radius:0;cursor:default;backdrop-filter:blur(1.5px)}
+.admin .floor-editor-layout{display:block!important}
+.admin .floor-editor-layout>.floor-canvas-panel{width:100%}
+.admin .floor-editor-layout>.floor-inspector{display:none!important}
+body.floor-panel-open .admin .floor-editor-layout>.floor-inspector{
+ display:block!important;position:fixed!important;top:0;right:0;bottom:0;
+ z-index:1120!important;width:min(440px,100vw)!important;max-width:none!important;
+ height:100dvh;max-height:100dvh;overflow-y:auto;overscroll-behavior:contain;
+ padding:22px 25px 35px!important;margin:0!important;border-radius:24px 0 0 24px!important;
+ box-shadow:-14px 0 55px rgba(31,24,17,.19);background:#fff;
+ scrollbar-width:thin;animation:oasi-drawer-in .22s ease-out both
+}
+.floor-inspector-header{position:sticky;top:-22px;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:15px;background:#fff;border-bottom:1px solid #ede6db;padding:14px 0 12px;margin:-4px 0 18px}
+.floor-inspector-close{border:1px solid #e0d6c8;background:#faf7f1;color:#32271d;font:400 25px/1 sans-serif;width:39px;height:39px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.floor-inspector-close:hover{background:#f0e6d7}
+.floor-panel-open .floor-inspector .panel{border:0!important;box-shadow:none!important;padding:0!important;margin:0!important}
+.floor-panel-open .floor-inspector .fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.floor-panel-open .floor-inspector h3{font-size:30px;margin:0 0 15px}
+.floor-panel-open .floor-inspector input,.floor-panel-open .floor-inspector select{min-width:0}
+@keyframes oasi-drawer-in{from{transform:translateX(28px);opacity:.75}to{transform:translateX(0);opacity:1}}
+@media(max-width:700px){
+ .floor-inspector-backdrop{background:rgba(36,30,24,.34)}
+ body.floor-panel-open .admin .floor-editor-layout>.floor-inspector{top:auto;left:0;right:0;bottom:0;width:100%!important;height:auto;max-height:88dvh;padding:18px 18px 30px!important;border-radius:24px 24px 0 0!important;box-shadow:0 -18px 50px #241b142b;animation:oasi-sheet-in .22s ease-out both}
+ .floor-inspector-header{top:-18px}
+ .floor-panel-open .floor-inspector .fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .floor-panel-open .floor-inspector .form-actions .btn{flex:1 1 auto}
+}
+@keyframes oasi-sheet-in{from{transform:translateY(35px);opacity:.8}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){body.floor-panel-open .admin .floor-editor-layout>.floor-inspector{animation:none}}
+@media print{.floor-inspector-backdrop{display:none!important}body.floor-panel-open{overflow:visible}}

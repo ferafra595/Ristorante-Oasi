@@ -61,7 +61,7 @@ const renderZones=zns=>`${unionGeometry(zns)}${(zns||[]).map(z=>`<button type="b
 const refreshZoneGeometry=()=>{const svg=$('.floor-union-svg');if(svg){const host=svg.parentElement;const temp=document.createElement('div');temp.innerHTML=unionGeometry(state.roomZones.filter(z=>z.room_id===state.room));if(temp.firstElementChild)host.replaceChild(temp.firstElementChild,svg);}};
 const renderFloorTable=t=>`<button type="button" class="floor-table ${esc(t.shape)} ${floorOrientation(t)} ${t.enabled?'':'off'}" data-table="${t.id}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;transform:rotate(${t.rotation}deg)"><span class="floor-table-code">${esc(t.code)}</span><small class="floor-table-meta">${floorTableCaption(t)}</small><small class="floor-table-modules">${floorTableModules(t)}</small><span class="floor-table-resize" title="Trascina per ridimensionare" aria-label="Ridimensiona tavolo"></span></button>`;
 async function loadAdmin(){try{await api('admin/me');state.user=true}catch{state.user=false}if(!state.user){root.innerHTML=`<main class="login-wrap"><div class="login-card"><img src="/logo-oasi.png" alt="Oasi"/><div class="eyebrow">AREA RISERVATA</div><h1>Benvenuto.</h1><p>Inserisci la password riservata per accedere al gestionale.</p><form id="login"><label>Password<input type="password" name="password" autocomplete="current-password" required autofocus/></label><button class="btn btn-dark full">Accedi <svg class="oasi-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M8 5h11v11"/></svg></button></form><p class="tiny"><a href="/">← Torna al sito</a></p></div></main>`;$('#login').onsubmit=async e=>{e.preventDefault();try{await api('admin/login','POST',inputData(e.target));state.user=true;renderAdmin()}catch(x){msg(x.message,'error')}};return}renderAdmin()}
-async function renderAdmin(){document.body.classList.remove('floor-mode-expanded');const tab=state.adminView;let html='';try{
+async function renderAdmin(){closeFloorInspector();document.body.classList.remove('floor-mode-expanded');const tab=state.adminView;let html='';try{
 if(tab==='dashboard'){
  const v=await api('admin/dashboard?date='+state.date);
  const guests=v.bookings.reduce((n,x)=>n+Number(x.guests||0),0);
@@ -92,11 +92,34 @@ root.innerHTML=adminShell(html,tab);bindAdmin();if(tab==='site')enableImageUploa
 
 const menuFields=[['section','Sezione: piatti, pizze, vini'],['category','Categoria'],['name','Nome'],['description','Descrizione','textarea'],['price','Prezzo (es. € 12,00)'],['allergens','Allergeni'],['image_url','URL foto'],['region','Regione vino'],['winery','Cantina'],['vintage','Annata'],['sort_order','Ordine','number'],['available','Disponibile','checkbox']];
 const galleryFields=[['image_url','URL immagine'],['caption','Didascalia'],['category','Categoria'],['sort_order','Ordine','number']];
+
+// Editor immediato: pannello laterale su PC, bottom sheet su smartphone.
+function closeFloorInspector(){
+ document.body.classList.remove('floor-panel-open');
+ document.querySelector('.floor-inspector-backdrop')?.remove();
+ const zone=document.querySelector('#table-properties');
+ if(zone){zone.removeAttribute('role');zone.removeAttribute('aria-modal')}
+}
+function openFloorInspector(zone){
+ if(!zone)return;
+ document.querySelector('.floor-inspector-backdrop')?.remove();
+ const backdrop=document.createElement('button');
+ backdrop.type='button';backdrop.className='floor-inspector-backdrop';backdrop.setAttribute('aria-label','Chiudi proprietà');
+ backdrop.onclick=closeFloorInspector;
+ document.body.append(backdrop);
+ document.body.classList.add('floor-panel-open');
+ zone.setAttribute('role','dialog');zone.setAttribute('aria-modal','true');zone.setAttribute('aria-label','Modifica elemento piantina');
+ zone.insertAdjacentHTML('afterbegin','<div class="floor-inspector-header"><span class="eyebrow">MODIFICA ELEMENTO</span><button type="button" class="floor-inspector-close" aria-label="Chiudi pannello">×</button></div>');
+ zone.querySelector('.floor-inspector-close').onclick=closeFloorInspector;
+ zone.scrollTop=0;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('floor-panel-open'))closeFloorInspector()});
+
 function structureEditor(record={}){
  const zone=$('#table-properties');if(!zone)return;
  const r={kind:'wall',label:'',x:50,y:50,w:120,h:14,rotation:0,...record};
  zone.innerHTML=sectionForm(record.id?'Modifica elemento':'Nuovo elemento',`<label>Tipo<select name="kind">${[['wall','Muro'],['column','Colonna'],['door','Ingresso / Porta'],['window','Finestra'],['label','Etichetta']].map(([v,t])=>`<option value="${v}" ${r.kind===v?'selected':''}>${t}</option>`).join('')}</select></label>${fields([['label','Etichetta'],['x','Posizione X (px)','number'],['y','Posizione Y (px)','number'],['w','Larghezza (px)','number'],['h','Altezza (px)','number'],['rotation','Rotazione (gradi)','number']],r)}`,record.id?'Salva modifiche':'Aggiungi alla piantina');
- zone.querySelector('#form-cancel').onclick=()=>zone.innerHTML='';
+ openFloorInspector(zone);zone.querySelector('#form-cancel').onclick=closeFloorInspector;
  if(record.id)zone.querySelector('.form-actions').insertAdjacentHTML('beforeend','<button class="mini danger" type="button" id="delete-structure">Elimina elemento</button>');
  $('#delete-structure')?.addEventListener('click',async()=>{if(!confirm('Eliminare questo elemento?'))return;try{await api('admin/floor-elements/'+record.id,'DELETE');renderAdmin()}catch(e){msg(e.message,'error')}});
  zone.querySelector('#editor-form').onsubmit=async e=>{e.preventDefault();try{await api('admin/floor-elements'+(record.id?'/'+record.id:''),record.id?'PUT':'POST',{...inputData(e.target),room_id:state.room});msg('Elemento salvato');renderAdmin()}catch(x){msg(x.message,'error')}};
@@ -128,7 +151,7 @@ function tableEditor(record={}){
  $('#attach-table-links').onclick=async()=>{const ids=[...zone.querySelectorAll('[data-link-target]:checked')].map(x=>+x.dataset.linkTarget);if(!ids.length)return msg('Seleziona almeno un tavolo da attaccare','error');let cursorX=Number(v.x)+Number(v.w)+8,cursorY=Number(v.y);try{for(const id of ids){const t=options.find(x=>x.id===id);if(!t)continue;const placeSide=floorOrientation(v)==='vertical'?'vertical':'horizontal';let newX=cursorX,newY=cursorY;if(placeSide==='vertical'){newX=Number(v.x);newY=cursorY+8}else if(cursorX+Number(t.w)>1100){newX=Math.max(0,Number(v.x));newY=Number(v.y)+Number(v.h)+8}await api('admin/tables/'+id,'PUT',{...t,x:newX,y:newY,orientation:floorOrientation(t)});cursorX=newX+Number(t.w);cursorY=newY+Number(t.h);await api('admin/table-links','POST',{table_a:v.id,table_b:id});}msg('Tavoli attaccati e collegati');renderAdmin();}catch(e){msg(e.message,'error')}};
  $('#save-table-links').onclick=async()=>{const checked=[...zone.querySelectorAll('[data-link-target]:checked')].map(x=>+x.dataset.linkTarget);try{for(const id of options.map(t=>t.id)){const was=linked.includes(id),want=checked.includes(id);if(was!==want)await api('admin/table-links',want?'POST':'DELETE',{table_a:v.id,table_b:id})}msg('Collegamenti salvati');renderAdmin()}catch(e){msg(e.message,'error')}};
  }
- zone.querySelector('#form-cancel').onclick=()=>zone.innerHTML='';
+ openFloorInspector(zone);zone.querySelector('#form-cancel').onclick=closeFloorInspector;
  const moduleField=zone.querySelector('[name="module_count"]');
  const shapeField=zone.querySelector('[name="shape"]');
  const orientationField=zone.querySelector('[name="orientation"]');
@@ -151,7 +174,7 @@ function zoneEditor(record={}){
  const form=`<div class="zone-editor-instruction">Trascina l’area sulla piantina per spostarla. Usa il quadratino nell’angolo in basso a destra per cambiarne la dimensione. Le misure qui sotto sono facoltative per regolazioni precise.</div><label>Nome ambiente<input name="label" value="${esc(z.label)}" required></label><label>X iniziale<input type="number" name="x" value="${z.x}" required></label><label>Y iniziale<input type="number" name="y" value="${z.y}" required></label><label>Larghezza area<input type="number" name="w" min="70" value="${z.w}" required></label><label>Altezza area<input type="number" name="h" min="70" value="${z.h}" required></label><div class="zone-editor-note">Le aree possono sovrapporsi o toccarsi: in piantina verranno percepite come ambiente unico, utile per sale a L o ali aggiuntive.</div>`;
  zone.innerHTML=sectionForm(z.id?'Modifica ambiente':'Aggiungi ambiente',form,z.id?'Salva ambiente':'Crea ambiente');
  if(z.id){zone.querySelector('.form-actions').insertAdjacentHTML('beforeend','<button type="button" class="mini danger" id="delete-zone">Elimina area</button>');$('#delete-zone').onclick=async()=>{if(!confirm('Eliminare questa area? I tavoli resteranno al loro posto.'))return;try{await api('admin/room-zones/'+z.id,'DELETE');renderAdmin()}catch(e){msg(e.message,'error')}}}
- zone.querySelector('#form-cancel').onclick=()=>zone.innerHTML='';zone.querySelector('#editor-form').onsubmit=async e=>{e.preventDefault();try{await api('admin/room-zones'+(z.id?'/'+z.id:''),z.id?'PUT':'POST',{...parseForm(e.target),room_id:state.room});msg('Ambiente salvato');renderAdmin()}catch(e){msg(e.message,'error')}};
+ openFloorInspector(zone);zone.querySelector('#form-cancel').onclick=closeFloorInspector;zone.querySelector('#editor-form').onsubmit=async e=>{e.preventDefault();try{await api('admin/room-zones'+(z.id?'/'+z.id:''),z.id?'PUT':'POST',{...parseForm(e.target),room_id:state.room});msg('Ambiente salvato');renderAdmin()}catch(e){msg(e.message,'error')}};
 }
 function editEntity(type,record={}){if(type==='tables')return tableEditor(record);const form=type==='rooms'?[['name','Nome sala'],['sort_order','Ordine','number'],['public_enabled','Prenotabile online','checkbox'],['internal_enabled','Gestione interna attiva','checkbox']]:type==='menu'?menuFields:galleryFields;const zone=type==='tables'?$('#table-properties'):$('#edit-area');zone.innerHTML=sectionForm(record.id?'Modifica':'Nuovo elemento',fields(form,record),record.id?'Salva modifiche':'Crea');if(type==='gallery'||type==='menu'){zone.querySelector('#editor-form').insertAdjacentHTML('afterbegin','<div class="upload"><label>Carica fotografia da dispositivo<input type="file" id="upload-file" accept="image/png,image/jpeg,image/webp,image/avif" /></label><button type="button" class="mini" id="upload-action">Carica</button><span id="upload-status"></span></div>');$('#upload-action').onclick=async()=>{const file=$('#upload-file').files[0];if(!file)return msg('Scegli una foto','error');const f=new FormData();f.append('file',file);try{const r=await fetch('/api/admin/upload',{method:'POST',body:f});const o=await r.json();if(!r.ok)throw Error(o.error);zone.querySelector('[name="image_url"]').value=o.url;$('#upload-status').textContent='Foto caricata'}catch(e){msg(e.message,'error')}}}
 zone.querySelector('#form-cancel').onclick=()=>{zone.innerHTML=''};zone.querySelector('#editor-form').onsubmit=async e=>{e.preventDefault();const b=parseForm(e.target);if(type==='tables'){b.room_id=state.room;b.x=Number(b.x??record.x??55);b.y=Number(b.y??record.y??55)}try{await api('admin/'+type+(record.id?'/'+record.id:''),record.id?'PUT':'POST',b);msg('Salvato correttamente');renderAdmin()}catch(e){msg(e.message,'error')}}}
