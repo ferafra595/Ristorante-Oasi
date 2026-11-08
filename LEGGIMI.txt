@@ -1,0 +1,26 @@
+RISTORANTE OASI — ADMIN V9 / PRENOTAZIONI E STAMPA
+
+Sostituisci su GitHub:
+- src/main.js
+- src/style.css
+- server/api.js
+
+Nessuna nuova tabella D1. Nessuna modifica ai binding, a R2 o ai segreti Cloudflare.
+
+NOVITÀ
+- Prenotazioni filtrabili per giorno e servizio (Tutti / Pranzo / Cena).
+- Navigazione rapida tra giorni e riepilogo prenotazioni/coperti.
+- Prenotazioni online e del personale mostrate insieme.
+- Dopo l'inserimento di una nuova prenotazione, il sistema apre il giorno e servizio appena salvati e controlla che il record sia visibile in D1.
+- Stampa elenco prenotazioni.
+- Stampa piantina delle sale coinvolte per il servizio, con numero tavolo, nome del cliente e numero ospiti (tavoli occupati evidenziati).
+- Le prenotazioni annullate restano nell'elenco storico del giorno, ma non vengono riportate nella stampa operativa.
+
+PRIMI TEST
+1. Crea una prenotazione staff per domani a cena e verifica il messaggio di conferma.
+2. Verifica che la pagina passi automaticamente alla data di domani e al filtro Cena.
+3. Ricarica la pagina e controlla che la prenotazione sia ancora presente usando gli stessi filtri.
+4. Premi “Stampa piantina con nomi”, verifica la grafica e i nomi nella finestra di stampa.
+
+ATTENZIONE
+Il backend continua ad applicare il vincolo di disponibilità per data e servizio; una prenotazione confermata impegna i tavoli assegnati per tutto il servizio. Prima dell'uso reale, prova inserimento simultaneo e stampe su browser desktop/mobile.
