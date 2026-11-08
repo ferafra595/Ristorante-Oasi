@@ -159,7 +159,7 @@ if(['table-links','room-zones'].includes(resource)){
  if(resource==='room-zones'){
    if(method==='GET')return json((await db.prepare('SELECT * FROM room_zones ORDER BY room_id,id').all()).results);
    if(method==='POST'||method==='PUT'){
-     const roomId=Number(b.room_id),x=Number(b.x),y=Number(b.y),w=Number(b.w),h=Number(b.h);if(!Number.isInteger(roomId)||![x,y,w,h].every(Number.isFinite)||w<70||h<70||x<0||y<0||x+w>780||y+h>490)return fail('La zona deve restare nella piantina (780 × 490) e misurare almeno 70 × 70');
+     const roomId=Number(b.room_id),x=Number(b.x),y=Number(b.y),w=Number(b.w),h=Number(b.h);if(!Number.isInteger(roomId)||![x,y,w,h].every(Number.isFinite)||w<70||h<70||x<0||y<0||x+w>1100||y+h>700)return fail('La zona deve restare nella piantina (1100 × 700) e misurare almeno 70 × 70');
      const room=await db.prepare('SELECT id FROM rooms WHERE id=?').bind(roomId).first();if(!room)return fail('Sala non trovata');
      if(method==='POST'){const r=await db.prepare('INSERT INTO room_zones(room_id,label,x,y,w,h) VALUES(?,?,?,?,?,?)').bind(roomId,clean(b.label,80),x,y,w,h).run();return json({ok:true,id:r.meta.last_row_id})}
      await db.prepare('UPDATE room_zones SET label=?,x=?,y=?,w=?,h=? WHERE id=? AND room_id=?').bind(clean(b.label,80),x,y,w,h,Number(parts[2]),roomId).run();return json({ok:true});
@@ -176,9 +176,12 @@ if(resource==='tables'){
   const max=Math.trunc(Number(b.seats)),min=Math.trunc(Number(b.min_seats));
   if(!Number.isInteger(max)||!Number.isInteger(min)||min<1||max<min||max>100)return fail('Imposta posti minimi e massimi validi');
   const inferredOrientation=shape==='rectangle'?(String(b.orientation||'').toLowerCase()==='vertical'||((Number(b.h)||0)>(Number(b.w)||0))?'vertical':'horizontal'):'horizontal';
-  const g=geometry(shape,modules,inferredOrientation), code=clean(b.code,30);if(!code)return fail('Inserisci il numero tavolo');
+  const proposed=geometry(shape,modules,inferredOrientation);
+  const customW=b.w==null?proposed.w:Number(b.w),customH=b.h==null?proposed.h:Number(b.h);
+  if(!Number.isFinite(customW)||!Number.isFinite(customH)||customW<55||customH<55||customW>1100||customH>700)return fail('Le dimensioni del tavolo non sono valide');
+  const g={w:Math.round(customW),h:Math.round(customH)}, code=clean(b.code,30);if(!code)return fail('Inserisci il numero tavolo');
   const x=Number(b.x),y=Number(b.y);if(!Number.isFinite(x)||!Number.isFinite(y))return fail('Posizione tavolo non valida');
-  const xx=Math.max(0,Math.min(780-g.w,Math.round(x))),yy=Math.max(0,Math.min(490-g.h,Math.round(y)));
+  const xx=Math.max(0,Math.min(1100-g.w,Math.round(x))),yy=Math.max(0,Math.min(700-g.h,Math.round(y)));
   const rot=Number(b.rotation)||0, enabled=b.enabled?1:0;
   if(method==='POST'){
    const r=await db.prepare('INSERT INTO tables(room_id,code,shape,seats,x,y,w,h,rotation,enabled,group_code) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(Number(b.room_id),code,shape,max,xx,yy,g.w,g.h,rot,enabled,'').run();
