@@ -28,9 +28,34 @@ async function ensureFloorV3(db){
  await db.prepare(`CREATE TABLE IF NOT EXISTS table_details (table_id INTEGER PRIMARY KEY REFERENCES tables(id) ON DELETE CASCADE,min_seats INTEGER NOT NULL DEFAULT 1,module_count INTEGER NOT NULL DEFAULT 1)`).run();
  await db.prepare(`CREATE TABLE IF NOT EXISTS table_links (table_a INTEGER NOT NULL REFERENCES tables(id) ON DELETE CASCADE,table_b INTEGER NOT NULL REFERENCES tables(id) ON DELETE CASCADE,PRIMARY KEY(table_a,table_b),CHECK(table_a<table_b))`).run();
  await db.prepare(`CREATE TABLE IF NOT EXISTS room_zones (id INTEGER PRIMARY KEY AUTOINCREMENT,room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,label TEXT NOT NULL DEFAULT '',x REAL NOT NULL,y REAL NOT NULL,w REAL NOT NULL,h REAL NOT NULL)`).run();
+ await db.prepare(`CREATE TABLE IF NOT EXISTS floor_plan_templates (room_id INTEGER PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE,data TEXT NOT NULL,updated_at TEXT NOT NULL)`).run();
 }
-const geometry=(shape,n)=>{const modules=Math.max(1,Math.min(8,Math.trunc(+n||1)));return shape==='circle'?{w:Math.round(74+15*(modules-1)),h:Math.round(74+15*(modules-1))}:shape==='rectangle'?{w:Math.round(100*modules),h:64}:{w:Math.round(72*modules),h:72}};
+const geometry=(shape,n,orientation='horizontal')=>{const modules=Math.max(1,Math.min(8,Math.trunc(+n||1)));if(shape==='circle'){const d=Math.round(76+16*(modules-1));return {w:d,h:d}}if(shape==='rectangle'){const long=Math.round(96+54*(modules-1)),short=72;return orientation==='vertical'?{w:short,h:long}:{w:long,h:short}}const side=Math.round(78+16*(modules-1));return {w:side,h:side}};
 const tableDetail=async(db,id)=>await db.prepare('SELECT min_seats,module_count FROM table_details WHERE table_id=?').bind(id).first();
+async function roomSnapshot(db,roomId){
+ await ensureFloorV3(db);
+ const [tables,elements,zones,links]=await Promise.all([
+  db.prepare('SELECT t.*,COALESCE(d.min_seats,1) min_seats,COALESCE(d.module_count,1) module_count FROM tables t LEFT JOIN table_details d ON d.table_id=t.id WHERE t.room_id=? ORDER BY t.id').bind(roomId).all(),
+  db.prepare('SELECT * FROM floor_elements WHERE room_id=? ORDER BY id').bind(roomId).all(),
+  db.prepare('SELECT * FROM room_zones WHERE room_id=? ORDER BY id').bind(roomId).all(),
+  db.prepare('SELECT l.* FROM table_links l JOIN tables a ON a.id=l.table_a JOIN tables b ON b.id=l.table_b WHERE a.room_id=? AND b.room_id=? ORDER BY l.table_a,l.table_b').bind(roomId,roomId).all()
+ ]);
+ return {tables:tables.results||[],elements:elements.results||[],zones:zones.results||[],links:links.results||[]};
+}
+async function saveRoomTemplate(db,roomId){const data=JSON.stringify(await roomSnapshot(db,roomId));await db.prepare('INSERT INTO floor_plan_templates(room_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(room_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at').bind(roomId,data,now()).run();return {ok:true}}
+async function loadRoomTemplate(db,roomId){await ensureFloorV3(db);const row=await db.prepare('SELECT data,updated_at FROM floor_plan_templates WHERE room_id=?').bind(roomId).first();return row?{found:true,updated_at:row.updated_at,data:JSON.parse(row.data)}:{found:false,data:null}}
+async function restoreRoomTemplate(db,roomId){
+ const tpl=await loadRoomTemplate(db,roomId);if(!tpl.found||!tpl.data)return false;const data=tpl.data;const tableIds=(data.tables||[]).map(t=>Number(t.id)).filter(Boolean);
+ for(const t of data.tables||[]){await db.prepare('UPDATE tables SET code=?,shape=?,seats=?,x=?,y=?,w=?,h=?,rotation=?,enabled=?,group_code=? WHERE id=? AND room_id=?').bind(clean(t.code,30),['circle','square','rectangle'].includes(t.shape)?t.shape:'square',Math.trunc(Number(t.seats)||1),Number(t.x)||0,Number(t.y)||0,Number(t.w)||60,Number(t.h)||60,Number(t.rotation)||0,t.enabled?1:0,clean(t.group_code||'',80),Number(t.id),roomId).run();await db.prepare('INSERT INTO table_details(table_id,min_seats,module_count) VALUES(?,?,?) ON CONFLICT(table_id) DO UPDATE SET min_seats=excluded.min_seats,module_count=excluded.module_count').bind(Number(t.id),Math.max(1,Math.trunc(Number(t.min_seats)||1)),Math.max(1,Math.trunc(Number(t.module_count)||1))).run();}
+ const existing=(await db.prepare('SELECT id FROM tables WHERE room_id=?').bind(roomId).all()).results||[];for(const row of existing){if(!tableIds.includes(Number(row.id))){await db.prepare('UPDATE tables SET enabled=0 WHERE id=?').bind(Number(row.id)).run();}}
+ await db.prepare('DELETE FROM table_links WHERE table_a IN (SELECT id FROM tables WHERE room_id=?) OR table_b IN (SELECT id FROM tables WHERE room_id=?)').bind(roomId,roomId).run();
+ for(const l of data.links||[]){if(tableIds.includes(Number(l.table_a))&&tableIds.includes(Number(l.table_b))){const one=Math.min(Number(l.table_a),Number(l.table_b)),two=Math.max(Number(l.table_a),Number(l.table_b));if(one>0&&two>0&&one!==two)await db.prepare('INSERT OR IGNORE INTO table_links(table_a,table_b) VALUES(?,?)').bind(one,two).run();}}
+ await db.prepare('DELETE FROM floor_elements WHERE room_id=?').bind(roomId).run();
+ for(const e of data.elements||[]){await db.prepare('INSERT INTO floor_elements(room_id,kind,label,x,y,w,h,rotation) VALUES(?,?,?,?,?,?,?,?)').bind(roomId,clean(e.kind,20),clean(e.label,80),Number(e.x)||0,Number(e.y)||0,Math.max(8,Number(e.w)||30),Math.max(8,Number(e.h)||30),Number(e.rotation)||0).run();}
+ await db.prepare('DELETE FROM room_zones WHERE room_id=?').bind(roomId).run();
+ for(const z of data.zones||[]){await db.prepare('INSERT INTO room_zones(room_id,label,x,y,w,h) VALUES(?,?,?,?,?,?)').bind(roomId,clean(z.label,80),Number(z.x)||0,Number(z.y)||0,Math.max(70,Number(z.w)||120),Math.max(70,Number(z.h)||120)).run();}
+ return true;
+}
 
 async function candidates(db,roomIds,date,service,party){
  if(!roomIds.length)return [];
@@ -110,6 +135,16 @@ if(resource==='floor-elements'){
  if(method==='DELETE'){await db.prepare('DELETE FROM floor_elements WHERE id=?').bind(Number(parts[2])).run();return json({ok:true})}
 }
 if(resource==='rooms'){if(method==='GET')return json((await db.prepare('SELECT * FROM rooms ORDER BY sort_order,id').all()).results);if(method==='POST'){await db.prepare('INSERT INTO rooms(name,public_enabled,internal_enabled,sort_order) VALUES(?,?,?,?)').bind(clean(b.name,80),b.public_enabled?1:0,1,Number(b.sort_order)||0).run();return json({ok:true})}if(method==='PUT'){await db.prepare('UPDATE rooms SET name=?,public_enabled=?,internal_enabled=?,sort_order=? WHERE id=?').bind(clean(b.name,80),b.public_enabled?1:0,b.internal_enabled?1:0,Number(b.sort_order)||0,Number(parts[2])).run();return json({ok:true})}if(method==='DELETE'){const n=await db.prepare('SELECT COUNT(*) n FROM tables WHERE room_id=?').bind(Number(parts[2])).first();if(n.n)return fail('Elimina prima i tavoli della sala');await db.prepare('DELETE FROM rooms WHERE id=?').bind(Number(parts[2])).run();return json({ok:true})}}
+if(resource==='floor-template'){
+ await ensureFloorV3(db);
+ const roomId=Number(new URL(ctx.request.url).searchParams.get('room_id')||b.room_id||parts[2]);
+ if(!Number.isInteger(roomId)||roomId<=0)return fail('Sala non valida');
+ if(method==='GET')return json(await loadRoomTemplate(db,roomId));
+ if(method==='PUT'){await saveRoomTemplate(db,roomId);return json({ok:true,message:'Piantina standard salvata'})}
+ if(method==='POST'){const ok=await restoreRoomTemplate(db,roomId);if(!ok)return fail('Nessuna piantina standard salvata per questa sala',404);return json({ok:true,message:'Piantina standard ripristinata'})}
+ if(method==='DELETE'){await db.prepare('DELETE FROM floor_plan_templates WHERE room_id=?').bind(roomId).run();return json({ok:true})}
+ return fail('Operazione non consentita',405);
+}
 if(['table-links','room-zones'].includes(resource)){
  await ensureFloorV3(db);
  if(resource==='table-links'){
@@ -140,7 +175,8 @@ if(resource==='tables'){
   const shape=['circle','square','rectangle'].includes(b.shape)?b.shape:'square';const modules=Math.max(1,Math.min(8,Math.trunc(Number(b.module_count)||1)));
   const max=Math.trunc(Number(b.seats)),min=Math.trunc(Number(b.min_seats));
   if(!Number.isInteger(max)||!Number.isInteger(min)||min<1||max<min||max>100)return fail('Imposta posti minimi e massimi validi');
-  const g=geometry(shape,modules), code=clean(b.code,30);if(!code)return fail('Inserisci il numero tavolo');
+  const inferredOrientation=shape==='rectangle'?(String(b.orientation||'').toLowerCase()==='vertical'||((Number(b.h)||0)>(Number(b.w)||0))?'vertical':'horizontal'):'horizontal';
+  const g=geometry(shape,modules,inferredOrientation), code=clean(b.code,30);if(!code)return fail('Inserisci il numero tavolo');
   const x=Number(b.x),y=Number(b.y);if(!Number.isFinite(x)||!Number.isFinite(y))return fail('Posizione tavolo non valida');
   const xx=Math.max(0,Math.min(780-g.w,Math.round(x))),yy=Math.max(0,Math.min(490-g.h,Math.round(y)));
   const rot=Number(b.rotation)||0, enabled=b.enabled?1:0;
