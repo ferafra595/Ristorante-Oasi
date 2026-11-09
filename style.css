@@ -357,6 +357,760 @@ body.floor-panel-open .admin .floor-editor-layout>.floor-inspector{
  .print-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #ad906a;padding:0 0 14px;margin-bottom:20px}
  .print-header strong{display:block;font:500 34px Georgia,serif}.print-header span{display:block;font-size:9px;letter-spacing:.17em;color:#8b755a}.print-header>div:last-child{text-align:right}.print-header p{margin:4px 0;color:#665a4a}
  .print-service{break-before:page}.print-service:first-of-type{break-before:auto}.print-service h2{font:500 25px Georgia,serif;margin:8px 0}.print-summary{padding:8px 0 12px;color:#665e55}
- .print-room{break-inside:avoid;margin:10px 0 16px}.print-room-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 8px}.print-room h3{font:600 17px Arial,sans-serif;margin:0}.print-room-sub{font-size:10px;color:#7a6e5f;letter-spacing:.08em;text-transform:uppercase}.print-room-svg{display:block;width:100%;height:auto;max-height:220mm;border:1px solid #ddd3c5;border-radius:10px;background:#fcfaf6}.print-room-svg text{fill:#2d261e;font-family:Arial,sans-serif}.print-table.occupied text{fill:#1f2d1f}
- .print-bookings{border-collapse:collapse;width:100%;margin:12px 0 0;white-space:normal;font-size:10px;break-inside:auto}.print-bookings th{background:#eee7dd}.print-bookings th,.print-bookings td{border:1px solid #d6cdc1;padding:7px;text-align:left}.print-bookings tr{break-inside:avoid}
+ .print-room{break-inside:avoid;margin:12px 0 18px}.print-room h3{font:600 17px Arial,sans-serif;margin:10px 0 8px}.print-room-svg{display:block;width:100%;height:auto;max-height:170mm;border:1px solid #ddd3c5}.print-room-svg text{fill:#2d261e;font-family:Arial,sans-serif}
+ .print-bookings{border-collapse:collapse;width:100%;margin:16px 0;white-space:normal;font-size:10px;break-inside:auto}.print-bookings th{background:#eee7dd}.print-bookings th,.print-bookings td{border:1px solid #d6cdc1;padding:7px;text-align:left}.print-bookings tr{break-inside:avoid}
 }
+
+/* OASI FASE 1 — Centro operativo */
+.op-toolbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin:0 0 20px;padding:18px 22px;border:1px solid #e9dfd4;background:#fff;border-radius:22px;box-shadow:0 12px 32px rgba(42,32,21,.04)}
+.op-toolbar label{display:grid;gap:7px;min-width:165px;flex:1 1 170px;max-width:250px;font-size:12px;font-weight:700;color:#7d6d5b}.op-toolbar label input,.op-toolbar label select{width:100%;min-height:44px;padding:9px 13px;border-radius:11px;border:1px solid #ded2c2;background:#fcfaf7;color:#2e2821;font:inherit;font-size:14px}
+.op-toolbar .mini{min-height:44px;min-width:90px;border-radius:12px}.op-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:0 0 20px}.op-kpis article{display:grid;align-content:center;gap:9px;min-height:112px;padding:17px 20px;background:#fff;border:1px solid #e9dfd4;border-radius:19px}.op-kpis article span{font-size:12px;color:#827467}.op-kpis article strong{font:500 43px/1 'Cormorant Garamond',Georgia,serif;color:#29241e}
+.op-dashboard-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:17px;margin-bottom:20px}.op-dashboard-grid>.panel,.op-service-layout>.panel,.op-service-list{border-radius:24px!important;padding:25px!important}.op-panel-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:17px}.op-panel-heading h3{font:500 30px/1.2 'Cormorant Garamond',Georgia,serif;margin:0;color:#28221c}.op-panel-heading h4{font-size:17px;margin:0;color:#27211c}.op-panel-heading .mini{white-space:nowrap}.op-arrival{display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid #eee5db}.op-arrival:last-child{border-bottom:0}.op-arrival time{min-width:56px;font-weight:700;color:#b0946e}.op-arrival>div{display:grid;gap:4px;flex:1;min-width:0}.op-arrival strong{font-size:14px;overflow-wrap:anywhere}.op-arrival small,.op-block small,.op-muted{display:block;font-size:12px;color:#8c7f72;line-height:1.6}.op-arrival .op-visit-select{max-width:155px}
+.op-visit-select{appearance:auto;min-width:125px;max-width:180px;min-height:38px;border:1px solid #d5c5b2;padding:7px 9px;border-radius:9px;background:#fbf6ef;color:#342b23;font-size:12px;font-weight:600}.op-visit-select:disabled{opacity:.5}.op-service-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0 18px}.op-service-stats>div{background:#f8f4ed;border-radius:15px;padding:17px}.op-service-stats span{display:block;color:#857767;font-size:12px}.op-service-stats strong{display:block;font:500 32px 'Cormorant Garamond',Georgia,serif;margin-top:9px}.op-action-row{display:flex;gap:10px;flex-wrap:wrap}.op-warning{border-radius:12px;padding:11px 14px;background:#f9eee1;color:#8a6437;font-size:13px}.op-quick{display:flex;position:relative;flex-direction:column;align-items:flex-start;text-align:left;gap:8px;border:1px solid #e8d8c4;background:linear-gradient(140deg,#fff,#f9f4ed);border-radius:20px;padding:21px;cursor:pointer;transition:transform .2s}.op-quick:hover{transform:translateY(-3px)}.op-quick strong{font-size:15px;color:#2e261d}.op-quick small{color:#877768;max-width:210px}.op-quick>span{position:absolute;right:19px;top:18px;color:#b59a79}.op-action-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.op-service-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(275px,.8fr);gap:18px;margin-bottom:20px}.op-room{margin:18px 0 22px}.op-room h4{font:500 24px 'Cormorant Garamond',Georgia,serif;margin:0 0 10px;color:#2c241d}.op-room-svg{display:block;width:100%;max-height:590px;border:1px solid #e4d4c1;background:#fcfaf6;border-radius:16px;box-shadow:0 10px 25px rgba(48,37,24,.06)}.op-table-map{cursor:pointer;outline:none}.op-table-map:hover{opacity:.8}.op-table-map text{pointer-events:none;fill:#30271f;font-family:Arial,sans-serif}.op-table-map:focus-visible g{stroke:#282522;stroke-width:5}.op-legend{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#857362}.op-legend span{background:#f8f3ed;padding:7px 9px;border-radius:99px}.op-legend span:nth-child(1){color:#48784b}.op-legend span:nth-child(2){color:#96754e}.op-legend span:nth-child(3){color:#4b789e}.op-legend span:nth-child(4){color:#ae5b57}.op-table-detail{border:1px solid #e7dbcd;background:#faf6f0;border-radius:16px;padding:16px;margin-top:16px}.op-table-detail>p{margin:5px 0 13px;font-size:13px;color:#6f5e4d}.op-table-detail select{width:100%;max-width:none}
+.op-block-form{display:grid;gap:12px}.op-block-form label{display:grid;gap:7px;font-size:12px;font-weight:650;color:#786959}.op-block-form input,.op-block-form select{background:#fcfaf7;min-height:44px;border-radius:11px;border:1px solid #dfd2c1;padding:10px;font:inherit;font-size:14px;max-width:100%;width:100%}.op-block-form .btn{margin:5px 0 15px;justify-content:center}.op-blocks{display:grid;gap:9px}.op-block{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;background:#faf5ed;border:1px solid #eadcc9;border-radius:13px}.op-block strong{font-size:13px}.op-block small{margin-top:4px}.op-block .mini{white-space:nowrap}.op-table{width:100%;border-collapse:collapse;font-size:13px}.op-table th{white-space:nowrap;font-size:12px;color:#857667;text-align:left}.op-table th,.op-table td{padding:14px 12px;border-bottom:1px solid #eee6dd;vertical-align:middle}.op-table td{min-width:85px}.op-table td strong{display:block}.op-table .op-muted{max-width:240px}.op-table a{color:#634d32;text-decoration:underline;text-underline-offset:3px}.op-empty{color:#887a6d;padding:20px 0}
+@media(max-width:1160px){.op-service-layout{grid-template-columns:1fr}.op-dashboard-grid{grid-template-columns:1fr}.op-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.op-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:680px){.op-toolbar{padding:13px;gap:8px;border-radius:16px}.op-toolbar label{max-width:none;flex:1 1 130px;min-width:0}.op-toolbar .mini{flex:1 1 90px}.op-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.op-kpis article{min-height:100px;padding:13px}.op-kpis article strong{font-size:36px}.op-dashboard-grid>.panel,.op-service-layout>.panel,.op-service-list{padding:15px!important;border-radius:18px!important}.op-action-grid{grid-template-columns:1fr 1fr;gap:8px}.op-quick{padding:15px;border-radius:15px;min-height:105px}.op-quick small{font-size:11px}.op-panel-heading h3{font-size:27px}.op-arrival{gap:8px}.op-arrival .op-visit-select{max-width:122px;min-width:95px;font-size:11px}.op-service-stats>div{padding:12px}.op-room-svg{border-radius:12px}}
+@media print{.op-toolbar,.op-kpis,.op-dashboard-grid,.op-service-layout,.op-service-list,.op-action-grid{display:none!important}}
+
+/* OASI - drawer operativo per prenotazioni e blocco tavoli */
+body.op-drawer-open{overflow:hidden}
+.op-drawer-layer{position:fixed;inset:0;z-index:1350;display:flex;justify-content:flex-end}
+.op-drawer-scrim{position:absolute;inset:0;width:100%;border:0;border-radius:0;background:rgba(28,24,20,.38);cursor:pointer}
+.op-drawer{position:relative;z-index:1;width:min(100%,450px);height:100%;max-height:100dvh;overflow-y:auto;overscroll-behavior:contain;background:#fffcf8;box-shadow:-20px 0 65px rgba(34,27,20,.18);padding:30px 30px 48px;animation:op-drawer-in .25s ease both}
+@keyframes op-drawer-in{from{transform:translateX(28px);opacity:.7}to{transform:translateX(0);opacity:1}}
+.op-drawer-top{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;border-bottom:1px solid #e5d8ca;padding-bottom:22px;margin-bottom:20px}
+.op-drawer-top h2{font:500 47px/1.05 'Cormorant Garamond',Georgia,serif;color:#29231d;margin:10px 0}
+.op-drawer-top p{color:#766957;font-size:13px;line-height:1.5;margin:0}
+.op-drawer-close{display:grid;place-items:center;flex-shrink:0;width:41px;height:41px;border:1px solid #e1d5c8;border-radius:50%;background:#faf6ef;font-size:28px;cursor:pointer;color:#342e27}
+.op-drawer-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}
+.op-drawer-form label{display:grid;gap:7px;color:#736654;font-size:12px;font-weight:700;min-width:0}
+.op-drawer-form label:first-child,.op-drawer-form label:nth-child(2),.op-drawer-form label:nth-child(5),.op-drawer-form label:nth-child(6),.op-drawer-form .op-drawer-help,.op-drawer-form .btn{grid-column:1/-1}
+.op-drawer-form input,.op-drawer-form textarea{width:100%;padding:12px 13px;min-height:45px;border:1px solid #dacbb9;background:#fff;border-radius:12px;font:inherit;font-weight:500;color:#28221d}
+.op-drawer-form textarea{min-height:82px;resize:vertical}
+.op-drawer-form .btn{justify-content:center;min-height:50px}
+.op-drawer-help{color:#796e63;font-size:12px;line-height:1.65;background:#f7f1e8;border:1px solid #e9dfd2;padding:12px 14px;border-radius:12px}
+.op-drawer-summary{display:flex;flex-direction:column;gap:7px;padding:15px 18px;border:1px solid #e8ddce;border-radius:16px;background:#f7f2eb}
+.op-drawer-summary strong{font-size:18px;color:#28231e}.op-drawer-summary span{color:#716456;font-size:13px}
+.op-drawer .op-state-label{display:grid;gap:10px;font-size:13px;font-weight:700;margin:16px 0}.op-drawer .op-visit-select{max-width:none;width:100%;min-height:45px}
+.op-drawer>.btn,.op-drawer>.mini{margin-top:12px;width:100%;justify-content:center;min-height:45px}
+@media(max-width:600px){.op-drawer{width:100%;padding:20px 20px 38px;animation:op-drawer-mobile .25s ease both}.op-drawer-top h2{font-size:39px}.op-drawer-form{gap:11px}@keyframes op-drawer-mobile{from{transform:translateY(25px);opacity:.6}to{transform:translateY(0);opacity:1}}}
+@media(prefers-reduced-motion:reduce){.op-drawer{animation:none}}
+@media print{.op-drawer-layer{display:none!important}}
+
+/* Gestione combinazioni temporanee tavoli – Servizio e sala */
+.op-multi-group{grid-column:1/-1;border:1px solid #dfd0bd;border-radius:17px;background:#faf5ed;padding:17px;display:grid;gap:9px}
+.op-multi-heading{display:grid;gap:4px;margin-bottom:5px;color:#2b241c}.op-multi-heading strong{font-size:15px}.op-multi-heading small{font-size:12px;color:#796955;line-height:1.55}
+.op-drawer-form .op-multi-option{grid-column:1/-1;display:flex;align-items:center;gap:12px;border:1px solid #e5d7c6;border-radius:11px;background:#fffdfa;padding:12px;cursor:pointer;color:#332b23}
+.op-multi-option input[type=checkbox]{width:20px;height:20px;min-height:0;flex:0 0 20px;accent-color:#8c6c43;cursor:pointer}
+.op-multi-option input:disabled{cursor:default}
+.op-multi-option span{display:grid;gap:3px}.op-multi-option strong{font-size:14px}.op-multi-option small{font-size:12px;color:#887765}
+.op-multi-capacity{padding:14px;border-radius:12px;background:#e8f1e4;border:1px solid #cbdac4;color:#355c39;display:grid;gap:4px;font-size:13px}
+.op-multi-capacity.invalid{background:#fff0e6;border-color:#ebcfb4;color:#8c5b37}
+.op-multi-capacity strong{font-size:14px}.op-multi-hint{font-size:12px;line-height:1.6;color:#756855;margin:5px 0 0}
+.op-multi-active{font-weight:700;color:#7c6547!important}
+@media(max-width:600px){.op-multi-group{padding:13px}.op-multi-option{padding:10px!important}}
+
+/* OASI FASE 2 — clienti e comunicazioni */
+.customer-search{margin-bottom:20px}.customer-search form{display:flex;align-items:end;flex-wrap:wrap;gap:12px}.customer-search form label{flex:1 1 260px}.customer-search p{font-size:13px;color:#8a8176;margin:14px 0 0}
+.phase2-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}.phase2-notice{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 0;border-bottom:1px solid #e9e1d6}.phase2-notice:last-child{border:0}.phase2-notice h3{font:500 23px 'Cormorant Garamond',Georgia,serif;margin:5px 0}.phase2-notice p{color:#6c6358;margin:5px 0}.phase2-notice small{color:#a88a61}.phase2-notice.read{opacity:.55}
+.phase2-email-state{display:inline-block;padding:7px 11px;border-radius:30px;background:#f0e8de;color:#83613a;font-weight:600;font-size:12px}.phase2-email-state.sent{background:#e0ecdf;color:#3b6741}.phase2-email-state.failed{background:#f5dfdb;color:#a34f49}.phase2-email-state.unconfigured{background:#f3ece0;color:#886b45}
+.phase2-drawer-wrap{position:fixed;inset:0;z-index:2200}.phase2-drawer-scrim{position:absolute;inset:0;border:0;background:rgba(24,23,22,.5);width:100%;cursor:pointer}.phase2-drawer{position:absolute;right:0;top:0;bottom:0;width:min(520px,100%);background:#fbf9f5;padding:30px;overflow:auto;box-shadow:-18px 0 70px #25211d28}.phase2-drawer h2{font:500 42px 'Cormorant Garamond',Georgia,serif;margin:14px 0 8px}.phase2-drawer form{display:grid;gap:15px;margin:24px 0}.phase2-drawer label{display:grid;gap:7px;font-weight:600;font-size:13px}.phase2-drawer input,.phase2-drawer textarea{width:100%;border:1px solid #ddd1c3;border-radius:13px;background:white;padding:13px;font:inherit}.phase2-history{display:grid;gap:9px}.phase2-history>div{background:#fff;border:1px solid #e6dbce;border-radius:15px;padding:12px 14px;display:grid;gap:5px}.phase2-history span{font-size:12px;color:#746b62}
+@media(max-width:650px){.customer-search form{display:grid}.customer-search form .btn,.customer-search form .mini{width:100%}.phase2-drawer{padding:22px 16px}.phase2-drawer h2{font-size:36px}.phase2-notice{align-items:start;flex-direction:column}}
+
+/* OASI FASE 2+ · anagrafica, comunicazioni, suggerimenti */
+.oasi-notification-count{display:inline-flex;min-width:24px;height:24px;align-items:center;justify-content:center;padding:0 6px;margin-left:9px;border-radius:18px;background:#a33d35;color:#fff;font-size:11px;font-weight:700;vertical-align:middle}
+.customer-card-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0}
+.customer-card-stats span{display:grid;gap:2px;background:#fff;border:1px solid #e5dbd0;border-radius:13px;padding:12px;font-size:12px;color:#6c6259}
+.customer-card-stats strong{display:block;color:#2f2924;font-size:22px}
+.customer-last-visit{margin:12px 0}
+.customer-contact-links{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.customer-wa{display:inline-flex!important;align-items:center;justify-content:center;gap:4px;text-decoration:none!important;color:#195d38!important;border-color:#a7cdb9!important;background:#edf8f1!important}
+.customer-autocomplete{margin:4px 0 12px;display:grid;gap:6px}
+.customer-autocomplete:empty{display:none}
+.customer-autocomplete p{font-size:12px;color:#73634f;font-weight:600;margin:0}
+.customer-suggestion{font:inherit;font-size:12px;text-align:left;line-height:1.45;padding:11px 12px;color:#342e28;background:#f6eee1;border:1px solid #ddcdbb;border-radius:10px;cursor:pointer;white-space:normal}
+.customer-suggestion:hover,.customer-suggestion:focus-visible{background:#eadac4;outline:2px solid #a98b68}
+.phase2-notice [data-notice-open]{margin-top:9px}
+
+/* Fase 3 - Statistiche e report */
+.analytics-filters form{display:flex;align-items:end;flex-wrap:wrap;gap:12px}.analytics-filters label{flex:1 1 150px;min-width:130px}.analytics-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.analytics-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}.analytics-stat{padding:22px}.analytics-stat small{display:block;color:#8a7a68;font-size:13px}.analytics-stat strong{display:block;font:400 clamp(23px,2.5vw,38px)/1.3 Georgia,serif;margin-top:12px}.analytics-section{margin:18px 0;padding:24px}.analytics-section h3{margin:0 0 12px}.analytics-muted,.analytics-footnote{color:#776a5c;font-size:13px}.analytics-chart{display:flex;align-items:flex-end;gap:7px;overflow-x:auto;min-height:194px;padding:20px 0 6px;border-bottom:1px solid #ddd1c2}.analytics-bar-col{min-width:32px;flex:1 0 32px;max-width:72px;display:flex;flex-direction:column;align-items:center;justify-content:end;gap:5px;color:#6a5b49;font-size:11px}.analytics-bar{width:100%;min-height:2px;background:linear-gradient(0deg,#9c7651,#c9aa84);border-radius:5px 5px 0 0}.analytics-bar-col small{font-size:10px;white-space:nowrap}.analytics-double{display:grid;grid-template-columns:1fr 1fr;gap:16px}.analytics-footnote{line-height:1.6;margin:18px 0 30px}@media(max-width:1050px){.analytics-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-double{grid-template-columns:1fr}}@media(max-width:520px){.analytics-stat-grid{gap:9px}.analytics-stat{padding:14px}.analytics-filters form{display:grid;grid-template-columns:1fr 1fr}.analytics-filters label{min-width:0}.analytics-filters form button{grid-column:1/-1}.analytics-section{padding:14px}}
+@media print{body:not(:has(.oasi-print-sheet)) .sidebar,body:not(:has(.oasi-print-sheet)) .admin-mobile,body:not(:has(.oasi-print-sheet)) .analytics-filters,body:not(:has(.oasi-print-sheet)) .analytics-actions{display:none!important}body:not(:has(.oasi-print-sheet)) .admin-main{margin:0!important;padding:0!important;width:100%!important}body:not(:has(.oasi-print-sheet)) .analytics-section,body:not(:has(.oasi-print-sheet)) .analytics-stat{break-inside:avoid;box-shadow:none!important}body:not(:has(.oasi-print-sheet)) .analytics-stat-grid{grid-template-columns:repeat(4,1fr)}body:not(:has(.oasi-print-sheet)) .analytics-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* Fase 3 completa: indicatori, confronto periodi e PDF dedicato */
+.analytics-delta{display:block;font-size:11px;line-height:1.5;color:#776a5c;margin-top:8px}
+.analytics-meter-list{display:grid;gap:18px;margin-top:18px}
+.analytics-meter-row>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:7px}
+.analytics-meter-row>div:first-child span{color:#807364}
+.analytics-meter-track{height:9px;background:#eee9e1;overflow:hidden;border-radius:30px}
+.analytics-meter-track>div{height:100%;background:#ad916e;border-radius:30px}
+.analytics-peaks{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.analytics-peaks>div{display:flex;flex-direction:column;gap:4px;background:#f7f3ed;padding:13px 17px;border-radius:11px;min-width:110px}
+.analytics-peaks strong{font:500 21px Georgia,serif}.analytics-peaks span{font-size:12px;color:#766a5e}
+.analytics-chart{scrollbar-width:thin}
+.oasi-analytics-print{display:none}
+@media print{
+ @page{size:A4 portrait;margin:13mm}
+ body.oasi-analytics-printing> :not(.oasi-analytics-print){display:none!important}
+ body.oasi-analytics-printing{margin:0!important;padding:0!important;background:#fff!important;color:#24211e!important}
+ body.oasi-analytics-printing .oasi-analytics-print{display:block!important;position:static!important;width:100%!important;font:11px/1.45 Arial,sans-serif;color:#292723;background:#fff}
+ .oasi-analytics-print-head{display:flex;align-items:center;justify-content:space-between;text-align:right;padding:0 0 13px;border-bottom:2px solid #9b8264;margin-bottom:15px}
+ .oasi-analytics-print-head>div:first-child{text-align:left}.oasi-analytics-print-head strong{font:32px Georgia,serif;display:block}.oasi-analytics-print-head small{font-size:9px;letter-spacing:.11em;color:#85705a}
+ .oasi-analytics-print h1{font:24px Georgia,serif;margin:12px 0 6px}.oasi-analytics-print h2{font:17px Georgia,serif;margin:16px 0 8px;break-after:avoid}
+ .oasi-analytics-print p{margin:7px 0 12px}
+ .oasi-analytics-print-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:17px 0;break-inside:avoid}
+ .oasi-analytics-print-kpis>div{border:1px solid #d7c7b6;padding:10px}.oasi-analytics-print-kpis small{font-size:10px;display:block;color:#766b60}.oasi-analytics-print-kpis strong{font:24px Georgia,serif;display:block;margin-top:5px}
+ .oasi-analytics-print table{border-collapse:collapse;width:100%;font-size:10px;table-layout:fixed}.oasi-analytics-print th{background:#ece3d7}.oasi-analytics-print th,.oasi-analytics-print td{border:1px solid #d8ccc0;text-align:left;padding:5px 6px;overflow-wrap:anywhere}
+ .oasi-analytics-print thead{display:table-header-group}.oasi-analytics-print tr{break-inside:avoid}.oasi-analytics-disclaimer{font-size:9px;color:#685d52;margin-top:15px}
+}
+
+/* OASI Fase 4 · Eventi e cerimonie (solo ADMIN) */
+.event-controls,.event-list,.event-note{margin-bottom:20px}.event-controls-head{display:flex;justify-content:space-between;align-items:center;gap:24px}.event-controls-head h3{margin:5px 0}.event-controls-head p,.event-note p{color:#74685b;font-size:14px;line-height:1.65}.event-filter{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-top:22px}.event-filter label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:#756958;font-weight:650}.event-filter input{min-height:44px;border:1px solid #e1d9cd;border-radius:10px;background:#fff;padding:9px 12px;color:#342e28}.event-filter .mini{min-height:44px}.event-pills{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.event-pills span{border:1px solid #e5ddd1;border-radius:30px;padding:10px 15px;color:#655b50;font-size:13px}.event-pills strong{color:#29241e;font-size:18px}.event-list-heading{display:flex;justify-content:space-between;align-items:center}.event-list-heading small{color:#8a7d6e}.event-row{display:grid;grid-template-columns:155px minmax(0,1fr) auto;gap:20px;align-items:center;padding:20px 0;border-bottom:1px solid #e9e2d8}.event-row:last-child{border-bottom:0}.event-row-cancelled{opacity:.65}.event-date{display:flex;flex-direction:column;gap:4px;color:#322b23}.event-date strong{font-size:14px}.event-date small{font-size:11px;color:#887b6c}.event-details{min-width:0}.event-title{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.event-title strong{font-size:18px;font-family:Georgia,serif;font-weight:500}.event-details p{margin:4px 0;color:#6b5d50;font-size:13px}.event-details small{font-size:12px;color:#87796a}.event-status{border-radius:20px;padding:4px 9px;font-size:11px;font-weight:700;background:#eee8dd;color:#665442}.event-status-confirmed{background:#dfece0;color:#335c39}.event-status-provisional{background:#fff0d2;color:#856122}.event-status-cancelled{background:#f0dfdf;color:#904b4b}.event-row-actions{display:flex;gap:8px;flex-wrap:wrap}.event-drawer-backdrop{position:fixed;inset:0;z-index:99999;background:rgba(22,20,17,.54);display:flex;justify-content:flex-end;animation:eventFade .12s ease-out}.event-drawer{width:min(580px,100vw);height:100dvh;overflow-y:auto;background:#faf8f5;box-shadow:-16px 0 45px #0002;padding:30px 30px 40px;animation:eventSlide .2s ease-out;color:#302922}.event-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:1px solid #e5ddd0;padding-bottom:20px;margin-bottom:20px}.event-drawer-head h2{font-family:Georgia,serif;font-size:29px;font-weight:400;margin:7px 0}.event-drawer-head p{margin:0;color:#8b7966;font-size:13px}.event-close{background:transparent;border:1px solid #e0d7c9;border-radius:100%;font-size:26px;width:40px;height:40px;cursor:pointer}.event-editor{display:flex;flex-direction:column;gap:18px}.event-editor label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600;color:#615242}.event-editor input:not([type=checkbox]),.event-editor textarea,.event-editor select{width:100%;background:#fff;border:1px solid #ded5c8;border-radius:10px;padding:12px;color:#302922;font-size:14px;min-height:46px}.event-editor textarea{resize:vertical}.event-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.event-room-choices{border:1px solid #ddd2c0;border-radius:12px;padding:15px}.event-room-choices legend{padding:0 5px;color:#5b5042;font-size:13px;font-weight:700}.event-room-option{display:flex!important;flex-direction:row!important;align-items:center;gap:10px!important;margin:8px 0;cursor:pointer}.event-room-option input{width:18px;height:18px;accent-color:#6c5537}.event-warning{background:#f5eada;border-radius:10px;padding:12px 14px;font-size:12px;color:#756044;line-height:1.6}.event-form-actions{display:flex;gap:10px;flex-wrap:wrap}.event-form-actions button{flex:1;min-width:145px}.op-block [data-quick="events"]{white-space:nowrap}@keyframes eventFade{from{opacity:0}to{opacity:1}}@keyframes eventSlide{from{transform:translateX(25px)}to{transform:translateX(0)}}@media(max-width:760px){.event-controls-head{flex-direction:column;align-items:stretch}.event-controls-head .btn{width:100%}.event-row{grid-template-columns:1fr;gap:8px}.event-row-actions{justify-content:flex-start}.event-filter>*{flex:1;min-width:125px}.event-drawer{padding:22px 18px 35px}.event-two{grid-template-columns:1fr}}@media print{.event-drawer-backdrop{display:none!important}}
+.event-internal-public-note{background:#f2eee7;border:1px solid #e5d7c5;padding:32px;border-radius:20px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px}.event-internal-public-note h3{font-family:Georgia,serif;font-size:26px;font-weight:400;margin:0}.event-internal-public-note p{line-height:1.7;color:#6f6253;margin:0 0 8px}
+
+/* Fase 5 – gestione sicurezza */
+.security-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}.security-facts p{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid #eadfd1}.security-facts span{text-align:right;color:#776b60}.security-grid .panel{min-width:0}@media(max-width:850px){.security-grid{grid-template-columns:1fr}.security-facts p{flex-direction:column;gap:4px}.security-facts span{text-align:left}}
+
+/* FASE 6 — rapidita' operativa e interfaccia touch, accesso ADMIN invariato */
+.oasi-admin-tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 22px;padding:10px;background:#fff;border:1px solid #e7dfd4;border-radius:18px}
+.oasi-admin-tools button{display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #e8dfd4;border-radius:11px;min-height:43px;padding:10px 15px;background:#f9f6f1;color:#342c23;font-size:13px;font-weight:600;cursor:pointer}
+.oasi-admin-tools .oasi-tool-search{margin-right:auto;flex:1;justify-content:flex-start;text-align:left;max-width:500px;color:#766a5d;font-weight:500}
+.oasi-admin-tools kbd{margin-left:auto;border:1px solid #ded3c2;border-radius:5px;padding:1px 6px;font:11px/1.4 monospace}
+.oasi-admin-tools button:focus-visible,.oasi-mobile-nav button:focus-visible,.oasi-search-overlay button:focus-visible{outline:3px solid #af8d65;outline-offset:2px}
+.oasi-mobile-nav{display:none}
+.oasi-search-is-open{overflow:hidden}
+.oasi-search-overlay{position:fixed;inset:0;z-index:999999;display:flex;justify-content:center;align-items:flex-start;padding:clamp(15px,9vh,90px) 16px 16px}
+.oasi-search-shade{position:absolute;inset:0;background:rgba(25,22,19,.56);border:0;cursor:pointer}
+.oasi-search-panel{position:relative;width:min(650px,100%);max-height:min(82dvh,780px);overflow:auto;background:#faf8f5;box-shadow:0 25px 85px #21190d45;border-radius:22px;padding:28px;color:#332d26}
+.oasi-search-heading{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:20px}.oasi-search-heading small{letter-spacing:.2em;color:#93795a;font-size:10px;font-weight:700}.oasi-search-heading h2{margin:8px 0;font:400 38px Georgia,serif}
+.oasi-search-close{border:1px solid #dfd5c6;background:white;border-radius:100px;width:42px;height:42px;font-size:24px;cursor:pointer}
+.oasi-search-input-wrap input{width:100%;border:1px solid #d9cbb9;border-radius:13px;min-height:55px;padding:14px 17px;background:white;font-size:16px}
+.oasi-search-help{color:#76695b;font-size:12px;line-height:1.5;margin:10px 0 16px}.oasi-search-results{display:flex;flex-direction:column;max-height:44dvh;overflow:auto;gap:7px}.oasi-search-results>p{color:#76695b;font-size:14px;padding:15px}
+.oasi-search-result{display:grid;gap:5px;text-align:left;background:#fff;border:1px solid #e8ded1;border-radius:12px;padding:13px 16px;cursor:pointer}.oasi-search-result:hover{background:#f2e9de}.oasi-search-result strong{font-size:15px}.oasi-search-result span{color:#55493e;font-size:13px;overflow-wrap:anywhere}.oasi-search-result small{font-size:11px;color:#806c57}
+.oasi-search-bottom{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;border-top:1px solid #e6dbcd;padding-top:16px}
+@media(max-width:760px){
+ .admin-main{padding:14px 12px calc(92px + env(safe-area-inset-bottom))!important}
+ .oasi-admin-tools{padding:8px;gap:7px;border-radius:13px;margin-bottom:13px;flex-wrap:nowrap}
+ .oasi-admin-tools button{padding:9px;min-height:44px;flex:none;font-size:18px}
+ .oasi-admin-tools button span,.oasi-admin-tools kbd{display:none}
+ .oasi-admin-tools .oasi-tool-search{flex:1;min-width:0;justify-content:flex-start;padding-left:15px}
+ .oasi-admin-tools .oasi-tool-search span{display:inline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+ .oasi-mobile-nav{position:fixed;bottom:0;left:0;right:0;z-index:1900;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:#fff;border-top:1px solid #e6dcca;padding:7px 5px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -7px 25px #241a1113}
+ .oasi-mobile-nav button{border:0;background:transparent;min-height:52px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;color:#7b6e5c;font-size:10px;font-weight:600;border-radius:10px;padding:5px 1px}
+ .oasi-mobile-nav button.active{color:#47321f;background:#f1e8dd}.oasi-nav-symbol{font-size:21px;line-height:1.1}
+ .oasi-search-overlay{padding:8px 8px calc(10px + env(safe-area-inset-bottom))}.oasi-search-panel{padding:22px 17px;width:100%;max-height:90dvh}.oasi-search-heading h2{font-size:31px}.oasi-search-results{max-height:42dvh}
+ .op-room-svg{min-width:0;max-width:100%;touch-action:manipulation}
+ .op-room{overflow:hidden}.op-room-svg [data-op-table]{cursor:pointer}
+ .reservation-control-panel,.reservation-list-panel,.op-service-list{min-width:0}
+ .admin .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ .admin .btn,.admin .mini{min-height:42px}
+}
+@media print{.oasi-admin-tools,.oasi-mobile-nav,.oasi-search-overlay{display:none!important}}
+
+/* OASI ADMIN — navigazione laterale ordinata, senza modificare la navigazione mobile. */
+@media(min-width:901px){
+ .admin{grid-template-columns:276px minmax(0,1fr)}
+ .sidebar{position:sticky;top:0;height:100dvh;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 14px 18px;background:#fff;scrollbar-width:thin;scrollbar-color:#d8caba transparent;display:flex;flex-direction:column;gap:0}
+ .oasi-side-head{padding:25px 11px 19px;border-bottom:1px solid #eee9e1;margin-bottom:16px}
+ .sidebar .side-brand{margin:0 0 12px;text-align:left}.sidebar .side-brand img{width:112px;max-height:58px;object-fit:contain;object-position:left}
+ .oasi-side-eyebrow{display:block;font-size:9px;color:#ae8d65;letter-spacing:.21em;font-weight:700;margin-bottom:13px}
+ .oasi-side-admin{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#645a50;background:#f9f7f3;border:1px solid #eee6da;border-radius:20px;padding:7px 11px}
+ .oasi-side-status{width:7px;height:7px;border-radius:50%;background:#5c9370;box-shadow:0 0 0 3px #dcece1}
+ .oasi-side-nav{flex:1;min-height:0}
+ .oasi-side-group{padding:0 0 9px;margin-bottom:7px;border-bottom:1px solid #f2eee8}
+ .oasi-side-group>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 11px;color:#9a7b56;font-size:10px;font-weight:700;letter-spacing:.16em;cursor:pointer;list-style:none;user-select:none;border-radius:8px}
+ .oasi-side-group>summary::-webkit-details-marker{display:none}
+ .oasi-side-group>summary:hover{background:#faf7f2}
+ .oasi-side-chevron{transition:transform .2s;flex:none;color:#ab9b8d}.oasi-side-group[open] .oasi-side-chevron{transform:rotate(180deg)}
+ .oasi-side-group-links{padding:2px 0 3px}
+ .sidebar .side-item{width:100%;display:flex;align-items:center;gap:12px;min-height:43px;padding:11px 12px;margin:2px 0;font-size:13px;line-height:1.35;text-align:left;border-radius:11px;color:#665c51;transition:background .15s,color .15s}
+ .sidebar .side-item:hover{background:#f6f1e9;color:#322820}
+ .sidebar .side-item.active{background:#efe7db;color:#241e17;font-weight:700;box-shadow:inset 3px 0 0 #aa8860}
+ .oasi-side-icon{width:18px;height:18px;flex:none;color:#98836d}.sidebar .side-item.active .oasi-side-icon{color:#8b6841}
+ .oasi-side-text{min-width:0;flex:1}
+ .oasi-notification-count{flex:none;margin-left:auto;border-radius:20px;padding:2px 6px;background:#9c4938;color:#fff;font-size:10px;line-height:1.2}
+ .oasi-side-footer{margin-top:auto;padding:13px 3px 0;border-top:1px solid #eee9e1;display:grid;gap:3px}
+ .oasi-side-footer-link{min-height:41px;width:100%;display:flex;align-items:center;gap:12px;padding:10px 11px;border:0;background:none;border-radius:10px;color:#695c50;text-align:left;font-size:12px;cursor:pointer}
+ .oasi-side-footer-link:hover{background:#f6f1e9;color:#241e17}
+ .oasi-side-logout{color:#805e54}
+ .sidebar button:focus-visible,.sidebar a:focus-visible,.sidebar summary:focus-visible{outline:2px solid #b49469;outline-offset:2px}
+}
+@media print{.sidebar{display:none!important}}
+
+
+/* --- Sidebar refinement v2 --- */
+@media (min-width: 901px){
+  .admin{
+    grid-template-columns: 296px minmax(0,1fr);
+  }
+  .sidebar{
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
+    padding: 18px 16px 16px;
+    background: linear-gradient(180deg,#fcfbf8 0%,#ffffff 100%);
+    display: grid;
+    grid-template-rows: auto minmax(0,1fr) auto;
+    gap: 12px;
+    border-right: 1px solid #ece4d8;
+    box-shadow: inset -1px 0 0 rgba(255,255,255,.7);
+  }
+  .oasi-side-head{
+    margin: 0;
+    padding: 6px 8px 14px;
+    border-bottom: 1px solid #efe7dc;
+  }
+  .sidebar .side-brand{
+    margin: 0 0 14px;
+  }
+  .sidebar .side-brand img{
+    width: 122px;
+    max-height: 64px;
+  }
+  .oasi-side-eyebrow{
+    font-size: 10px;
+    letter-spacing: .22em;
+    color: #a6845f;
+    margin-bottom: 12px;
+  }
+  .oasi-side-admin{
+    min-height: 38px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    background: #f8f4ee;
+    border: 1px solid #ece2d5;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5f564d;
+  }
+  .oasi-side-status{
+    width: 8px;
+    height: 8px;
+    box-shadow: 0 0 0 4px #e3efe7;
+  }
+  .oasi-side-nav{
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: #d7c7b2 transparent;
+  }
+  .oasi-side-nav::-webkit-scrollbar{
+    width: 8px;
+  }
+  .oasi-side-nav::-webkit-scrollbar-thumb{
+    background: #d7c7b2;
+    border-radius: 999px;
+  }
+  .oasi-side-nav::-webkit-scrollbar-track{
+    background: transparent;
+  }
+  .oasi-side-group{
+    margin: 0 0 12px;
+    padding: 6px;
+    border: 1px solid #efe7dc;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 10px 22px rgba(81,58,34,.04);
+  }
+  .oasi-side-group > summary{
+    min-height: 42px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    color: #9d7a50;
+    font-size: 11px;
+    letter-spacing: .18em;
+    background: transparent;
+  }
+  .oasi-side-group > summary:hover{
+    background: #fbf7f1;
+  }
+  .oasi-side-chevron{
+    width: 16px;
+    height: 16px;
+    color: #b09a82;
+  }
+  .oasi-side-group-links{
+    padding: 4px 0 2px;
+  }
+  .sidebar .side-item{
+    min-height: 50px;
+    padding: 13px 14px;
+    margin: 3px 0;
+    gap: 13px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #5f554a;
+    background: transparent;
+  }
+  .sidebar .side-item:hover{
+    background: #f8f2ea;
+    color: #2c241d;
+  }
+  .sidebar .side-item.active{
+    background: #efe5d7;
+    color: #221c16;
+    font-weight: 700;
+    box-shadow: inset 4px 0 0 #ab8455;
+  }
+  .oasi-side-icon{
+    width: 19px;
+    height: 19px;
+    color: #9b846a;
+  }
+  .sidebar .side-item.active .oasi-side-icon{
+    color: #8b6942;
+  }
+  .oasi-side-text{
+    font-size: 15px;
+    line-height: 1.25;
+  }
+  .oasi-notification-count{
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: auto;
+  }
+  .oasi-side-footer{
+    margin-top: 0;
+    padding: 4px 0 0;
+    border-top: 1px solid #efe7dc;
+    display: grid;
+    gap: 8px;
+  }
+  .oasi-side-footer-link{
+    min-height: 46px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #ece4d8;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    color: #5f554a;
+    box-shadow: 0 8px 20px rgba(81,58,34,.03);
+  }
+  .oasi-side-footer-link:hover{
+    background: #f8f2ea;
+    color: #241e17;
+  }
+  .oasi-side-logout{
+    color: #825d54;
+  }
+  .admin-main{
+    padding-left: clamp(24px,3vw,42px);
+  }
+}
+
+@media (max-width: 900px){
+  .admin-mobile{
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    background: rgba(250,248,245,.96);
+    backdrop-filter: blur(8px);
+    padding: 12px 0 16px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee5d9;
+  }
+  .admin-mobile select{
+    border-radius: 14px;
+    min-height: 46px;
+    border-color: #decfbc;
+    background: #fff;
+  }
+}
+/* ========================================================================
+   OASI ADMIN — Restyling coordinato 2026
+   Solo presentazione: nessuna modifica alle chiamate API o ai dati.
+   La sidebar approvata resta invariata. Le regole non alterano la stampa.
+   ======================================================================== */
+@media screen {
+  .admin {
+    --oasi-ink: #27231e;
+    --oasi-muted: #756b61;
+    --oasi-gold: #a3835f;
+    --oasi-line: #e7e0d5;
+    --oasi-soft: #f7f3ec;
+    --oasi-wash: #fbf9f5;
+    --oasi-shadow: 0 12px 38px rgba(58, 42, 22, .038);
+    color: var(--oasi-ink);
+    background: #faf8f4;
+  }
+  .admin-main {
+    width: 100%;
+    min-width: 0;
+    background: radial-gradient(ellipse 80% 420px at 85% 0%,rgba(224,210,190,.16),transparent 82%), #faf8f5;
+    padding-top: 30px;
+    padding-bottom: 60px;
+  }
+  /* Distinct sections instead of tall empty blocks */
+  .admin-main .admin-head {margin: 9px 0 25px;}
+  .admin-main .admin-head .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    color: #9c7853; font-size: 10px; letter-spacing: .22em;
+  }
+  .admin-main .admin-head h1 {
+    font-family: 'Cormorant Garamond',Georgia,serif;
+    font-weight: 500;
+    font-size: clamp(42px, 4.15vw, 63px);
+    line-height: 1.03; letter-spacing: -.033em;
+    margin: 11px 0 11px; color: #29221b;
+  }
+  .admin-main .admin-head p {
+    font-size: 14px; line-height: 1.7; color: #81766c;
+    max-width: 760px;
+  }
+  /* A single precise card system across the admin */
+  .admin-main .panel {
+    border: 1px solid var(--oasi-line);
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: var(--oasi-shadow);
+    padding: clamp(20px, 2.15vw, 29px);
+    margin-bottom: 19px;
+  }
+  .admin-main .panel h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(25px, 2.25vw, 32px);
+    line-height: 1.15; font-weight: 500;
+    letter-spacing: -.017em; color: #2b241d;
+  }
+  .admin-main .panel h4 {color: #302820;}
+  .admin-main p {line-height: 1.63;}
+  /* Toolbar / global search */
+  .admin-main .oasi-admin-tools {
+    background: rgba(255,255,255,.95);
+    box-shadow: 0 5px 20px rgba(58,42,22,.035);
+    padding: 9px; border-radius: 17px;
+    gap: 8px; border: 1px solid var(--oasi-line);
+    margin-bottom: 25px;
+  }
+  .admin-main .oasi-admin-tools button {
+    border: 1px solid #e9e1d7;
+    border-radius: 11px; background: #fbf9f5;
+    color: #3a322b; font-size: 13px; font-weight: 600;
+    transition: background .14s ease, border-color .14s ease, transform .14s ease;
+  }
+  .admin-main .oasi-admin-tools button:hover {background:#f2ebe1;border-color:#d8c5ad; transform:translateY(-1px);}
+  .admin-main .oasi-tool-search {background:#f9f6f1!important;max-width:none!important;}
+  .admin-main .oasi-admin-tools kbd {background:white;color:#827468;}
+  /* Consistent inputs and semantic focus */
+  .admin-main label {color:#60564d;font-size:12px;letter-spacing:.015em;line-height:1.45;}
+  .admin-main input:not([type=checkbox]):not([type=file]),
+  .admin-main select,.admin-main textarea {
+    border-radius: 12px;
+    border: 1px solid #e0d6c9;
+    background: #fffdfa;
+    color: #2a241d;
+    min-height: 46px;
+    padding: 11px 13px;
+    box-shadow: none;
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  .admin-main input:focus-visible,.admin-main select:focus-visible,.admin-main textarea:focus-visible,
+  .admin-main button:focus-visible,.admin-main a:focus-visible {
+    outline: 2px solid #a78156;
+    outline-offset: 2px;
+  }
+  .admin-main input:not([type=checkbox]):not([type=file]):focus,
+  .admin-main select:focus,.admin-main textarea:focus {
+    border-color: #a88b69; background: #fff;
+    box-shadow: 0 0 0 3px rgba(168,139,105,.1);
+  }
+  .admin-main input::placeholder,.admin-main textarea::placeholder{color:#a69c91;}
+  /* Buttons unify interactive components while retaining function */
+  .admin-main .btn {
+    border-radius: 13px; min-height: 46px;
+    padding: 13px 20px; font-size: 13px; font-weight: 650;
+    gap: 14px;
+    transition: transform .15s ease,box-shadow .15s ease,background .15s ease;
+  }
+  .admin-main .btn-dark {
+    background: #292622; border-color: #292622; color: #fff;
+    box-shadow: 0 5px 12px rgba(36,30,23,.09);
+  }
+  .admin-main .btn-dark:hover {background:#43392e; transform:translateY(-1px);box-shadow:0 8px 19px rgba(36,30,23,.14);}
+  .admin-main .btn-outline,.admin-main .btn-light {
+    color:#473a2d;border-color:#d9caba;background:#fff;
+  }
+  .admin-main .btn-outline:hover {background:#f8f1e8;}
+  .admin-main .mini {
+    background:#fffdfa;border:1px solid #dfd3c4;
+    border-radius: 10px; min-height: 36px;
+    padding: 8px 12px; font-size:12px;font-weight:600;color:#594a3b;
+    transition: background .15s,border-color .15s;
+  }
+  .admin-main .mini:hover {background:#f5ede2;border-color:#c8ac8c;}
+  .admin-main .mini.danger {color:#a24747;background:#fffafa;border-color:#efd2cd;}
+  /* KPI cards and daily service visual hierarchy */
+  .admin-main .op-toolbar {
+    border-radius: 19px;background:#fff;box-shadow:var(--oasi-shadow);
+    border-color:var(--oasi-line);padding:18px 20px;gap:12px;
+  }
+  .admin-main .op-kpis {gap:12px;margin:0 0 19px;}
+  .admin-main .op-kpis article {
+    min-width:0; min-height: 124px;
+    border-radius: 19px;
+    border:1px solid #e7ddcf;
+    box-shadow:0 9px 28px rgba(63,47,28,.035);
+    padding:18px 18px 17px;
+    background:linear-gradient(157deg,#fff 58%,#fbf7ef);
+  }
+  .admin-main .op-kpis article span {
+    color: #776b60; font-size: 12px;
+    font-weight: 600; line-height:1.45;
+  }
+  .admin-main .op-kpis article strong {
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:47px;line-height:.97; font-weight:600;
+    color:#30261d; letter-spacing:-.04em;
+  }
+  .admin-main .op-kpis article:first-child {border-top:3px solid #ae8960;}
+  .admin-main .op-dashboard-grid {gap:18px;}
+  .admin-main .op-dashboard-grid>.panel,
+  .admin-main .op-service-layout>.panel,
+  .admin-main .op-service-list {
+    padding:clamp(20px,2vw,27px)!important;
+    border-radius:22px!important;
+  }
+  .admin-main .op-panel-heading {
+    gap:14px; align-items:flex-start;
+    border-bottom: 1px solid #f0eae3;
+    padding-bottom: 14px; margin-bottom:18px;
+  }
+  .admin-main .op-panel-heading h3 {font-size:30px;}
+  .admin-main .op-panel-heading .mini {white-space:nowrap;}
+  .admin-main .op-arrival {border-bottom-color:#eee8df;}
+  .admin-main .op-arrival time {
+    color:#8e6b42; background:#faf4ec;border-radius:9px;
+    padding:7px 10px;font-weight:700;
+  }
+  .admin-main .op-service-stats>div {
+    background:#faf6ef;border:1px solid #eee3d4;
+    border-radius:14px;padding:18px;
+  }
+  .admin-main .op-action-grid{gap:13px;}
+  .admin-main .op-quick {
+    border-radius:18px; padding:21px;
+    background:linear-gradient(145deg,#fff,#fcf9f4);
+    border-color:#e8dfd4;box-shadow:0 8px 22px rgba(52,38,21,.027);
+  }
+  .admin-main .op-quick:hover{border-color:#cbb69d;box-shadow:0 13px 28px rgba(52,38,21,.075);}
+  .admin-main .op-quick strong{font-size:15px;}
+  .admin-main .op-quick small{line-height:1.55;}
+  /* Operational floorplan remains large and legible */
+  .admin-main .op-service-layout {gap:19px;}
+  .admin-main .op-room {
+    border-radius:18px; padding:16px;
+    background:#fcfaf6; border:1px solid #ece1d3;
+  }
+  .admin-main .op-room h4 {margin:0 0 13px;font-size:26px;}
+  .admin-main .op-room-svg {
+    background:#fffcf8;border:1px solid #e4d5c1;
+    box-shadow:none;border-radius:14px;
+  }
+  .admin-main .op-legend {
+    background:#faf6f0;border:1px solid #eee3d5;
+    border-radius:13px;padding:10px 12px;
+  }
+  .admin-main .op-block {
+    border:1px solid #eee2d3;border-radius:13px;background:#fffdf9;
+  }
+  .admin-main .op-block-form {
+    border-bottom:1px solid #eee8df;padding-bottom:16px;margin-bottom:16px;
+  }
+  /* Reservations: form and table share one visual language */
+  .admin-main .reservation-control-panel {
+    padding:26px!important;
+    background:#fff!important;
+    border-radius:22px;
+  }
+  .admin-main .reservation-control-head {
+    align-items:center;gap:17px;
+  }
+  .admin-main .reservation-control-head h3 {margin:5px 0;}
+  .admin-main .reservation-filters {
+    padding:17px;background:#fbf8f3;border:1px solid #eee5d9;
+    border-radius:15px;gap:12px;
+  }
+  .admin-main .reservation-summary {gap:9px;}
+  .admin-main .reservation-summary>span {
+    background:#f7f2eb;border:1px solid #ebdfd0;
+    color:#615448;border-radius:12px;padding:12px 15px;
+  }
+  .admin-main .reservation-print-actions {gap:10px;}
+  .admin-main .reservation-print-actions .btn {border-radius:12px;}
+  .admin-main .reservation-list-panel {overflow:hidden;}
+  .admin-main .reservation-list-panel h3 {margin:0 0 18px;}
+  /* Tables: visible row boundaries, calm header and clear actions */
+  .admin-main .table-scroll {
+    max-width:100%;min-width:0;overflow-x:auto;
+    scrollbar-width:thin;scrollbar-color:#d5c7b5 #faf8f5;
+    border:1px solid #eee7dd;border-radius:14px;
+  }
+  .admin-main table{border-collapse:separate;border-spacing:0;white-space:nowrap;}
+  .admin-main th{
+    background:#f9f5ef;color:#87745f;
+    font-size:11px;font-weight:700;letter-spacing:.065em;
+    text-transform:uppercase;padding:14px 15px;border-bottom:1px solid #ebe1d4;
+  }
+  .admin-main td{
+    font-size:13px;line-height:1.45;
+    color:#43392f;padding:15px;border-bottom:1px solid #f0eae3;
+  }
+  .admin-main tbody tr:last-child td{border-bottom:none;}
+  .admin-main tbody tr:hover td{background:#fdfaf6;}
+  .admin-main td small {font-size:11px;color:#8b8075;}
+  .admin-main .reservation-status {font-weight:700;letter-spacing:.01em;}
+  /* Customer directory, notification feed, audit */
+  .admin-main .customer-search form {gap:12px;}
+  .admin-main .customer-search p {font-size:12px;}
+  .admin-main .customer-card-stats span {
+    border-radius:14px;background:linear-gradient(160deg,#fff,#fbf7f1);
+    border-color:#e9dfd3;padding:16px;
+  }
+  .admin-main .customer-card-stats strong {
+    font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;
+  }
+  .admin-main .phase2-notice {
+    padding:17px 2px;gap:17px;
+    border-bottom:1px solid #eee7de;
+  }
+  .admin-main .phase2-email-state {border-radius:999px;}
+  .admin-main .security-grid {gap:16px;}
+  /* Analytics: consistent grids + charts */
+  .admin-main .analytics-filters {border-radius:21px;}
+  .admin-main .analytics-filters form {gap:13px;}
+  .admin-main .analytics-stat-grid {gap:12px;}
+  .admin-main .analytics-stat {
+    min-width:0;padding:22px;
+    border-radius:18px;
+    border:1px solid #e7ded3;
+    background:linear-gradient(155deg,#fff,#fbf8f3);
+  }
+  .admin-main .analytics-stat small {color:#86786a;font-size:12px;font-weight:600;}
+  .admin-main .analytics-stat strong {
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:clamp(30px,2.55vw,42px);
+    color:#30261f;
+  }
+  .admin-main .analytics-section {
+    border-radius:21px;padding:25px;
+  }
+  .admin-main .analytics-meter-track {height:11px;background:#f1e9df;}
+  .admin-main .analytics-meter-track>div {background:linear-gradient(90deg,#aa845d,#ccb08c);}
+  .admin-main .analytics-peaks>div {border:1px solid #ebe0d3;border-radius:14px;}
+  /* Events and ceremonies */
+  .admin-main .event-controls-head {align-items:center;}
+  .admin-main .event-filter {
+    background:#faf7f2;border:1px solid #eee2d5;
+    padding:15px;border-radius:14px;
+  }
+  .admin-main .event-list {border-radius:22px;}
+  .admin-main .event-note {background:#fff9f1;}
+  /* Traditional CMS forms and floor-plan inspector */
+  .admin-main .floor-layout{gap:18px;}
+  .admin-main .floor-canvas-panel,
+  .admin-main .floor-inspector{border-radius:22px;}
+  .admin-main .form-actions{gap:10px;}
+  .admin-main .gallery-admin{gap:14px;}
+  .admin-main .gallery-admin .panel{border-radius:17px;}
+  /* Drawers: common style without changing semantics or their stacking */
+  .op-drawer,.phase2-drawer {
+    background:#fcfaf7;border-left:1px solid #e7ddcf;
+    box-shadow:-18px 0 70px rgba(35,27,16,.17);
+  }
+  .op-drawer-top,.phase2-drawer-header {
+    border-bottom-color:#e9dfd1;
+  }
+  .op-drawer input,.op-drawer select,.op-drawer textarea,
+  .phase2-drawer input,.phase2-drawer select,.phase2-drawer textarea {
+    border-radius:12px;border-color:#ded1c0;background:#fff;
+  }
+  .op-drawer .btn,.phase2-drawer .btn {border-radius:12px;}
+  /* Desktop density tuning */
+  @media (min-width:901px) {
+    .admin-main{padding-left:clamp(22px,3vw,43px);padding-right:clamp(22px,3vw,43px);}
+  }
+  @media (max-width:1190px) {
+    .admin-main .op-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .admin-main .analytics-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (max-width:900px) {
+    .admin-main .admin-head{margin-top:3px;margin-bottom:19px;}
+    .admin-main .admin-head h1{font-size:clamp(38px,7vw,52px);}
+    .admin-main .op-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .admin-main .op-service-layout{grid-template-columns:1fr;}
+    .admin-main .op-room{padding:11px;}
+  }
+  @media (max-width:650px) {
+    .admin-main {padding-left:12px!important;padding-right:12px!important;}
+    .admin-main .panel {padding:17px;border-radius:17px;margin-bottom:13px;}
+    .admin-main .op-dashboard-grid>.panel,
+    .admin-main .op-service-layout>.panel,
+    .admin-main .op-service-list {padding:16px!important;border-radius:17px!important;}
+    .admin-main .admin-head h1{font-size:41px;}
+    .admin-main .admin-head p{font-size:13px;}
+    .admin-main .oasi-admin-tools{margin-bottom:14px;}
+    .admin-main .op-toolbar {padding:12px;border-radius:15px;gap:8px;}
+    .admin-main .op-kpis {grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+    .admin-main .op-kpis article {min-height:98px;padding:14px;}
+    .admin-main .op-kpis article strong{font-size:36px;}
+    .admin-main .op-panel-heading h3{font-size:27px;}
+    .admin-main .op-room {padding:8px;}
+    .admin-main .op-room h4{font-size:24px;}
+    .admin-main .reservation-control-panel{padding:16px!important;}
+    .admin-main .reservation-filters{padding:12px;}
+    .admin-main .reservation-summary{gap:7px;}
+    .admin-main .reservation-summary>span{padding:10px 12px;font-size:12px;}
+    .admin-main .analytics-section{padding:16px;}
+    .admin-main .analytics-stat{padding:15px;}
+    .admin-main .analytics-stat strong{font-size:31px;}
+    .admin-main .event-filter{padding:12px;}
+    .admin-main .admin-head h1{overflow-wrap:anywhere;}
+  }
+  @media (max-width:375px){
+    .admin-main .op-kpis article strong{font-size:32px;}
+    .admin-main .analytics-stat-grid{grid-template-columns:1fr 1fr;}
+    .admin-main .mini{padding:7px 9px;}
+  }
+  @media (prefers-reduced-motion:reduce) {
+    .admin-main .btn,.admin-main .mini,.admin-main .op-quick,
+    .admin-main input,.admin-main select,.admin-main textarea{transition:none;}
+  }
+}
+
+/* Oasi ADMIN — New reservation right-side drawer */
+body.oasi-booking-drawer-open{overflow:hidden}
+.oasi-booking-drawer-layer{position:fixed;inset:0;z-index:2400;display:flex;justify-content:flex-end}
+.oasi-booking-drawer-shade{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:rgba(30,25,20,.42);cursor:pointer}
+.oasi-booking-drawer{position:relative;z-index:1;width:min(100%,560px);height:100%;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:#fcfaf7;box-shadow:-20px 0 70px rgba(30,24,18,.2);animation:oasi-booking-drawer-in .22s ease-out both}
+@keyframes oasi-booking-drawer-in{from{transform:translateX(30px);opacity:.8}to{transform:translateX(0);opacity:1}}
+.oasi-booking-drawer-header{padding:32px 32px 21px;display:flex;gap:18px;justify-content:space-between;align-items:flex-start;background:#fff;border-bottom:1px solid #e9dfd2}
+.oasi-booking-drawer-header h2{font:500 clamp(33px,3vw,46px)/1.03 'Cormorant Garamond',Georgia,serif;color:#2b241d;margin:11px 0 8px;letter-spacing:-.025em}
+.oasi-booking-drawer-header p{font-size:13px;line-height:1.55;color:#74685d;margin:0;max-width:390px}
+.oasi-booking-drawer-close{flex:none;width:42px;height:42px;display:grid;place-items:center;padding:0;border:1px solid #e1d6c8;border-radius:50%;background:#faf7f2;color:#44382d;font-size:27px;line-height:1;cursor:pointer}
+.oasi-booking-drawer-close:hover{background:#efe7da}
+.oasi-booking-drawer-form{display:flex;flex-direction:column;flex:1;min-height:0}
+.oasi-booking-drawer-fields{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:26px 32px 22px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin;scrollbar-color:#d0bea8 transparent}
+.oasi-booking-drawer-fields label{display:flex;flex-direction:column;gap:9px;font-size:12px;line-height:1.4;font-weight:700;color:#605144;min-width:0}
+.oasi-booking-drawer-fields input,.oasi-booking-drawer-fields select,.oasi-booking-drawer-fields textarea{width:100%;min-width:0;min-height:49px;padding:12px 14px;border:1px solid #ded2c4;border-radius:12px;background:#fff;color:#2b251f;font-size:14px;font-weight:500;box-shadow:none}
+.oasi-booking-drawer-fields textarea{min-height:95px;resize:vertical}
+.oasi-booking-drawer-fields input:focus,.oasi-booking-drawer-fields select:focus,.oasi-booking-drawer-fields textarea:focus{outline:2px solid #bda17b;outline-offset:1px;border-color:#a98b63}
+.oasi-booking-drawer-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.oasi-booking-drawer-hint{background:#f6f0e7;border:1px solid #e9dfd0;padding:14px 16px;border-radius:14px;color:#766655;font-size:12px;line-height:1.6;margin:2px 0 4px}
+.oasi-booking-drawer-actions{display:flex;gap:12px;padding:18px 32px 22px;background:#fff;border-top:1px solid #e9dfd2;box-shadow:0 -12px 30px rgba(40,28,18,.03)}
+.oasi-booking-drawer-actions .btn{min-height:52px;justify-content:center;border-radius:12px;gap:9px;flex:1;white-space:normal;text-align:center;padding:12px 16px}
+.oasi-booking-drawer-actions .btn-dark{flex:1.5}
+.oasi-booking-drawer-actions .btn[disabled]{opacity:.62;cursor:wait;transform:none}
+.oasi-booking-drawer .customer-autocomplete{margin:0}
+@media(max-width:600px){.oasi-booking-drawer{width:100%;animation:oasi-booking-drawer-mobile .22s ease-out both}.oasi-booking-drawer-header{padding:22px 20px 18px}.oasi-booking-drawer-header h2{font-size:37px}.oasi-booking-drawer-fields{padding:20px 18px;gap:15px}.oasi-booking-drawer-pair{gap:10px}.oasi-booking-drawer-actions{padding:13px 16px max(17px,env(safe-area-inset-bottom));gap:9px}.oasi-booking-drawer-actions .btn{font-size:12px;padding:12px 8px;min-height:48px}}
+@media(max-width:360px){.oasi-booking-drawer-pair{grid-template-columns:1fr}.oasi-booking-drawer-header h2{font-size:33px}}
+@keyframes oasi-booking-drawer-mobile{from{transform:translateY(20px);opacity:.7}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.oasi-booking-drawer{animation:none!important}}
+@media print{.oasi-booking-drawer-layer{display:none!important}}
