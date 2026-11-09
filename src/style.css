@@ -505,3 +505,33 @@ body.op-drawer-open{overflow:hidden}
  .admin .btn,.admin .mini{min-height:42px}
 }
 @media print{.oasi-admin-tools,.oasi-mobile-nav,.oasi-search-overlay{display:none!important}}
+
+/* OASI ADMIN — navigazione laterale ordinata, senza modificare la navigazione mobile. */
+@media(min-width:901px){
+ .admin{grid-template-columns:276px minmax(0,1fr)}
+ .sidebar{position:sticky;top:0;height:100dvh;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 14px 18px;background:#fff;scrollbar-width:thin;scrollbar-color:#d8caba transparent;display:flex;flex-direction:column;gap:0}
+ .oasi-side-head{padding:25px 11px 19px;border-bottom:1px solid #eee9e1;margin-bottom:16px}
+ .sidebar .side-brand{margin:0 0 12px;text-align:left}.sidebar .side-brand img{width:112px;max-height:58px;object-fit:contain;object-position:left}
+ .oasi-side-eyebrow{display:block;font-size:9px;color:#ae8d65;letter-spacing:.21em;font-weight:700;margin-bottom:13px}
+ .oasi-side-admin{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#645a50;background:#f9f7f3;border:1px solid #eee6da;border-radius:20px;padding:7px 11px}
+ .oasi-side-status{width:7px;height:7px;border-radius:50%;background:#5c9370;box-shadow:0 0 0 3px #dcece1}
+ .oasi-side-nav{flex:1;min-height:0}
+ .oasi-side-group{padding:0 0 9px;margin-bottom:7px;border-bottom:1px solid #f2eee8}
+ .oasi-side-group>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 11px;color:#9a7b56;font-size:10px;font-weight:700;letter-spacing:.16em;cursor:pointer;list-style:none;user-select:none;border-radius:8px}
+ .oasi-side-group>summary::-webkit-details-marker{display:none}
+ .oasi-side-group>summary:hover{background:#faf7f2}
+ .oasi-side-chevron{transition:transform .2s;flex:none;color:#ab9b8d}.oasi-side-group[open] .oasi-side-chevron{transform:rotate(180deg)}
+ .oasi-side-group-links{padding:2px 0 3px}
+ .sidebar .side-item{width:100%;display:flex;align-items:center;gap:12px;min-height:43px;padding:11px 12px;margin:2px 0;font-size:13px;line-height:1.35;text-align:left;border-radius:11px;color:#665c51;transition:background .15s,color .15s}
+ .sidebar .side-item:hover{background:#f6f1e9;color:#322820}
+ .sidebar .side-item.active{background:#efe7db;color:#241e17;font-weight:700;box-shadow:inset 3px 0 0 #aa8860}
+ .oasi-side-icon{width:18px;height:18px;flex:none;color:#98836d}.sidebar .side-item.active .oasi-side-icon{color:#8b6841}
+ .oasi-side-text{min-width:0;flex:1}
+ .oasi-notification-count{flex:none;margin-left:auto;border-radius:20px;padding:2px 6px;background:#9c4938;color:#fff;font-size:10px;line-height:1.2}
+ .oasi-side-footer{margin-top:auto;padding:13px 3px 0;border-top:1px solid #eee9e1;display:grid;gap:3px}
+ .oasi-side-footer-link{min-height:41px;width:100%;display:flex;align-items:center;gap:12px;padding:10px 11px;border:0;background:none;border-radius:10px;color:#695c50;text-align:left;font-size:12px;cursor:pointer}
+ .oasi-side-footer-link:hover{background:#f6f1e9;color:#241e17}
+ .oasi-side-logout{color:#805e54}
+ .sidebar button:focus-visible,.sidebar a:focus-visible,.sidebar summary:focus-visible{outline:2px solid #b49469;outline-offset:2px}
+}
+@media print{.sidebar{display:none!important}}
