@@ -58,7 +58,7 @@ async function adminGoTo(tab,openNew=false){
  state.adminView=tab;
  await renderAdmin();
  window.scrollTo({top:0,behavior:'instant'});
- if(openNew){const button=$('#new-book');if(button){button.click();$('#edit-area')?.scrollIntoView({block:'start',behavior:'smooth'});$('#edit-area input[name="name"]')?.focus()}else msg('Apri Prenotazioni per creare una prenotazione.','error')}
+ if(openNew){const button=$('#new-book');if(button)button.click();else msg('Apri Prenotazioni per creare una prenotazione.','error')}
 }
 function closeAdminSearch(){document.querySelector('.oasi-search-overlay')?.remove();document.body.classList.remove('oasi-search-is-open');$('#admin-search-open')?.focus()}
 function openAdminSearch(){
@@ -169,7 +169,7 @@ function oasiSyncSignature(rows){return JSON.stringify(rows.map(r=>[
  ]).sort((a,b)=>Number(a[0])-Number(b[0])))}
 function oasiSyncSafeToRender(){
  if(!state.user||location.pathname!=='/admin'||document.hidden||!oasiSyncViews.has(state.adminView))return false;
- if(document.querySelector('.oasi-search-overlay,.phase2-drawer-wrap,.event-drawer-backdrop,.op-drawer-layer,.floor-inspector-backdrop,.oasi-print-sheet'))return false;
+ if(document.querySelector('.oasi-search-overlay,.phase2-drawer-wrap,.event-drawer-backdrop,.op-drawer-layer,.oasi-booking-drawer-layer,.floor-inspector-backdrop,.oasi-print-sheet'))return false;
  if(document.body.classList.contains('floor-panel-open')||document.querySelector('#edit-area form'))return false;
  if(document.querySelector('form:focus-within,[contenteditable="true"]:focus'))return false;
  return true;
@@ -620,6 +620,69 @@ function bindEvents(){
  document.querySelector('#event-filter')?.addEventListener('submit',e=>{e.preventDefault();const data=new FormData(e.target);state.eventRange={start:String(data.get('start')||''),end:String(data.get('end')||'')};renderAdmin()});
  document.querySelector('#event-all')?.addEventListener('click',()=>{state.eventRange={start:'',end:''};renderAdmin()});
 }
+function openNewBookingDrawer(){
+ // One drawer for the ADMIN agenda and the global quick-create shortcut.
+ const old=document.querySelector('.oasi-booking-drawer-layer');
+ if(old)old.querySelector('.oasi-booking-drawer-close')?.click();
+ const layer=document.createElement('div');layer.className='oasi-booking-drawer-layer';
+ const startService=(state.reservationService==='dinner'||state.opsService==='dinner')?'dinner':'lunch';
+ layer.innerHTML=`<button type="button" class="oasi-booking-drawer-shade" aria-label="Chiudi nuova prenotazione"></button>
+ <aside class="oasi-booking-drawer" role="dialog" aria-modal="true" aria-labelledby="oasi-new-book-title" tabindex="-1">
+  <header class="oasi-booking-drawer-header"><div><span class="eyebrow">RISTORANTE OASI · ADMIN</span><h2 id="oasi-new-book-title">Nuova prenotazione</h2><p>Inserisci una prenotazione telefonica. Il tavolo viene assegnato in base alla disponibilità.</p></div><button class="oasi-booking-drawer-close" type="button" aria-label="Chiudi pannello">×</button></header>
+  <form id="oasi-booking-drawer-form" class="oasi-booking-drawer-form">
+   <div class="oasi-booking-drawer-fields"><div class="oasi-booking-drawer-pair"><label>Data *<input name="date" type="date" value="${esc(state.date)}" required></label><label>Servizio *<select name="service"><option value="lunch" ${startService==='lunch'?'selected':''}>Pranzo</option><option value="dinner" ${startService==='dinner'?'selected':''}>Cena</option></select></label></div>
+   <div class="oasi-booking-drawer-pair"><label>Ora di arrivo *<input name="time" type="time" required value="${startService==='lunch'?'12:30':'19:30'}"></label><label>Persone *<input name="party_size" type="number" min="1" max="200" required value="2"></label></div>
+   <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
+   <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" placeholder="Numero di telefono"></label>
+   <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
+   <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
+   <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
+   <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">Registra prenotazione</button></footer>
+  </form>
+ </aside>`;
+ document.body.appendChild(layer);
+ document.body.classList.add('oasi-booking-drawer-open');
+ const panel=layer.querySelector('.oasi-booking-drawer'),form=layer.querySelector('form'),submit=layer.querySelector('.oasi-booking-drawer-submit');
+ const focusBefore=document.activeElement;
+ let saving=false;
+ const onKey=e=>{
+  if(e.key==='Escape'&&!saving){e.preventDefault();close()}
+  if(e.key==='Tab'){
+   const els=[...panel.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])')].filter(el=>el.getClientRects().length);
+   if(!els.length)return;
+   if(e.shiftKey&&document.activeElement===els[0]){e.preventDefault();els[els.length-1].focus()}
+   else if(!e.shiftKey&&document.activeElement===els[els.length-1]){e.preventDefault();els[0].focus()}
+  }
+ };
+ function close(){if(saving)return;document.removeEventListener('keydown',onKey);layer.remove();document.body.classList.remove('oasi-booking-drawer-open');if(focusBefore?.isConnected)focusBefore.focus()}
+ layer.querySelector('.oasi-booking-drawer-shade').onclick=close;
+ layer.querySelector('.oasi-booking-drawer-close').onclick=close;
+ layer.querySelector('.oasi-booking-drawer-cancel').onclick=close;
+ document.addEventListener('keydown',onKey);
+ const serviceInput=form.elements.service,timeInput=form.elements.time;
+ serviceInput.addEventListener('change',()=>{const prev=timeInput.value;if(['12:30','19:30'].includes(prev))timeInput.value=serviceInput.value==='lunch'?'12:30':'19:30'});
+ customerAutocomplete(form);
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();if(saving)return;
+  saving=true;submit.disabled=true;submit.textContent='Salvataggio...';
+  let created=null;
+  try{
+   const payload=inputData(form);
+   created=await api('admin/reservations','POST',payload);
+   state.date=payload.date;state.reservationService=payload.service;
+   const savedRows=await api('admin/reservations?date='+encodeURIComponent(payload.date)+'&service='+encodeURIComponent(payload.service));
+   if(!savedRows.some(r=>Number(r.id)===Number(created.id))){
+    msg('Prenotazione creata, ma non ancora visibile nell’agenda. Non ripetere il salvataggio: verifica in D1.','error');
+   }else msg('Prenotazione registrata · tavolo assegnato');
+   saving=false;close();await renderAdmin();
+  }catch(err){
+   if(created){msg('Prenotazione creata, ma la verifica non è riuscita: non inviarla di nuovo.','error');saving=false;close();await renderAdmin();return}
+   msg(err.message,'error');saving=false;submit.disabled=false;submit.textContent='Registra prenotazione';
+  }
+ });
+ requestAnimationFrame(()=>form.elements.name?.focus());
+}
+
 function bindAdmin(){
  document.querySelectorAll('#edit-area form,#op-new-reservation').forEach(customerAutocomplete);
  document.querySelectorAll('[data-notice-open]').forEach(btn=>btn.addEventListener('click',async()=>{try{await api('admin/notifications/'+btn.dataset.noticeOpen,'PATCH',{});state.date=btn.dataset.noticeDate||state.date;state.reservationService=btn.dataset.noticeService||'all';state.adminView='reservations';renderAdmin()}catch(e){msg(e.message,'error')}}));
@@ -748,7 +811,7 @@ document.querySelectorAll('[data-quick]').forEach(el=>el.addEventListener('click
  el.addEventListener('pointercancel',()=>{drag=null;el.classList.remove('dragging');renderAdmin()});
  el.addEventListener('click',e=>{if(suppress){e.preventDefault();e.stopPropagation();return}document.querySelectorAll('.floor-table.is-selected').forEach(x=>x.classList.remove('is-selected'));el.classList.add('is-selected');editEntity('tables',t)});
  });$('#editor-form')?.addEventListener('submit',async e=>{if(!['site','booking'].includes(state.adminView))return;e.preventDefault();const v=inputData(e.target);let obj=state.settings[state.adminView];if(state.adminView==='site')obj={...obj,...v};else obj={...obj,maxOnline:Number(v.maxOnline),maxDaysAhead:Number(v.maxDaysAhead),minNoticeMinutes:Number(v.minNoticeMinutes),closedDates:v.closedDates.split(',').map(x=>x.trim()).filter(Boolean),lunch:{...obj.lunch,start:v.lunchStart,last:v.lunchLast},dinner:{...obj.dinner,start:v.dinnerStart,last:v.dinnerLast}};try{await api('admin/settings/'+state.adminView,'PUT',obj);msg('Impostazioni salvate')}catch(x){msg(x.message,'error')}});
-$('#new-book')?.addEventListener('click',()=>{const z=$('#edit-area');z.innerHTML=sectionForm('Prenotazione telefonica',`<label>Data<input name="date" type="date" value="${state.date}" required/></label><label>Servizio<select name="service"><option value="lunch">Pranzo</option><option value="dinner">Cena</option></select></label>${fields([['time','Ora di arrivo','time'],['party_size','Persone','number'],['name','Nome cliente'],['phone','Telefono'],['email','Email obbligatoria','email'],['notes','Note']])}`,'Registra prenotazione');z.querySelector('[name=time]').value='12:30';z.querySelector('[name=party_size]').value=2;z.querySelector('[name=email]').required=true;z.querySelector('[name=phone]').required=true;z.querySelector('[name=name]').required=true;z.querySelector('#form-cancel').onclick=()=>z.innerHTML='';customerAutocomplete(z.querySelector('form'));z.querySelector('form').onsubmit=async e=>{e.preventDefault();try{const payload=inputData(e.target);const saved=await api('admin/reservations','POST',payload);state.date=payload.date;state.reservationService=payload.service;const savedRows=await api('admin/reservations?date='+encodeURIComponent(payload.date)+'&service='+encodeURIComponent(payload.service));if(!savedRows.some(r=>Number(r.id)===Number(saved.id)))throw Error('La prenotazione è stata accettata dal server ma non risulta ancora nell’elenco: non crearne un duplicato. Verifica in D1.');msg('Prenotazione registrata · tavolo assegnato');renderAdmin()}catch(x){msg(x.message,'error')}}});document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=async()=>{if(!confirm('Annullare la prenotazione?'))return;try{await api('admin/reservations/'+b.dataset.cancel,'PATCH',{status:'cancelled'});renderAdmin()}catch(x){msg(x.message,'error')}});document.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{const r=state.reservations.find(x=>x.id==b.dataset.move);const zone=$('#edit-area');zone.innerHTML=sectionForm('Sposta tavolo · Prenotazione '+r.id,`<label>Identificativi dei tavoli (separati da virgola)<input name="ids" value="${esc(r.table_ids||'')}" required/></label>`,'Salva assegnazione');zone.querySelector('#form-cancel').onclick=()=>zone.innerHTML='';zone.querySelector('form').onsubmit=async e=>{e.preventDefault();try{await api('admin/reservations/'+r.id,'PATCH',{table_ids:e.target.elements.ids.value.split(',').map(Number)});renderAdmin()}catch(x){msg(x.message,'error')}}})}
+$('#new-book')?.addEventListener('click',openNewBookingDrawer);document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=async()=>{if(!confirm('Annullare la prenotazione?'))return;try{await api('admin/reservations/'+b.dataset.cancel,'PATCH',{status:'cancelled'});renderAdmin()}catch(x){msg(x.message,'error')}});document.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{const r=state.reservations.find(x=>x.id==b.dataset.move);const zone=$('#edit-area');zone.innerHTML=sectionForm('Sposta tavolo · Prenotazione '+r.id,`<label>Identificativi dei tavoli (separati da virgola)<input name="ids" value="${esc(r.table_ids||'')}" required/></label>`,'Salva assegnazione');zone.querySelector('#form-cancel').onclick=()=>zone.innerHTML='';zone.querySelector('form').onsubmit=async e=>{e.preventDefault();try{await api('admin/reservations/'+r.id,'PATCH',{table_ids:e.target.elements.ids.value.split(',').map(Number)});renderAdmin()}catch(x){msg(x.message,'error')}}})}
 async function start(){if(location.pathname==='/admin'){await loadAdmin();return}try{state.data=await api('public')}catch(e){state.data={site:{address:'Contrada Serrarossa, 88835 Roccabernarda KR',phone:'338 703 6868'},booking:{lunch:{start:'12:30',last:'14:30'},dinner:{start:'19:30',last:'23:00'}},gallery:[],menu:[]};msg('Configura il database per attivare prenotazioni e contenuti.','error')}renderPublic()}
 window.addEventListener('resize',()=>{if(floorZoom.mode==='fit')applyFloorZoom()});
 start();

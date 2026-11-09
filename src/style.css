@@ -1084,3 +1084,33 @@ body.op-drawer-open{overflow:hidden}
     .admin-main input,.admin-main select,.admin-main textarea{transition:none;}
   }
 }
+
+/* Oasi ADMIN — New reservation right-side drawer */
+body.oasi-booking-drawer-open{overflow:hidden}
+.oasi-booking-drawer-layer{position:fixed;inset:0;z-index:2400;display:flex;justify-content:flex-end}
+.oasi-booking-drawer-shade{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:rgba(30,25,20,.42);cursor:pointer}
+.oasi-booking-drawer{position:relative;z-index:1;width:min(100%,560px);height:100%;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:#fcfaf7;box-shadow:-20px 0 70px rgba(30,24,18,.2);animation:oasi-booking-drawer-in .22s ease-out both}
+@keyframes oasi-booking-drawer-in{from{transform:translateX(30px);opacity:.8}to{transform:translateX(0);opacity:1}}
+.oasi-booking-drawer-header{padding:32px 32px 21px;display:flex;gap:18px;justify-content:space-between;align-items:flex-start;background:#fff;border-bottom:1px solid #e9dfd2}
+.oasi-booking-drawer-header h2{font:500 clamp(33px,3vw,46px)/1.03 'Cormorant Garamond',Georgia,serif;color:#2b241d;margin:11px 0 8px;letter-spacing:-.025em}
+.oasi-booking-drawer-header p{font-size:13px;line-height:1.55;color:#74685d;margin:0;max-width:390px}
+.oasi-booking-drawer-close{flex:none;width:42px;height:42px;display:grid;place-items:center;padding:0;border:1px solid #e1d6c8;border-radius:50%;background:#faf7f2;color:#44382d;font-size:27px;line-height:1;cursor:pointer}
+.oasi-booking-drawer-close:hover{background:#efe7da}
+.oasi-booking-drawer-form{display:flex;flex-direction:column;flex:1;min-height:0}
+.oasi-booking-drawer-fields{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:26px 32px 22px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin;scrollbar-color:#d0bea8 transparent}
+.oasi-booking-drawer-fields label{display:flex;flex-direction:column;gap:9px;font-size:12px;line-height:1.4;font-weight:700;color:#605144;min-width:0}
+.oasi-booking-drawer-fields input,.oasi-booking-drawer-fields select,.oasi-booking-drawer-fields textarea{width:100%;min-width:0;min-height:49px;padding:12px 14px;border:1px solid #ded2c4;border-radius:12px;background:#fff;color:#2b251f;font-size:14px;font-weight:500;box-shadow:none}
+.oasi-booking-drawer-fields textarea{min-height:95px;resize:vertical}
+.oasi-booking-drawer-fields input:focus,.oasi-booking-drawer-fields select:focus,.oasi-booking-drawer-fields textarea:focus{outline:2px solid #bda17b;outline-offset:1px;border-color:#a98b63}
+.oasi-booking-drawer-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.oasi-booking-drawer-hint{background:#f6f0e7;border:1px solid #e9dfd0;padding:14px 16px;border-radius:14px;color:#766655;font-size:12px;line-height:1.6;margin:2px 0 4px}
+.oasi-booking-drawer-actions{display:flex;gap:12px;padding:18px 32px 22px;background:#fff;border-top:1px solid #e9dfd2;box-shadow:0 -12px 30px rgba(40,28,18,.03)}
+.oasi-booking-drawer-actions .btn{min-height:52px;justify-content:center;border-radius:12px;gap:9px;flex:1;white-space:normal;text-align:center;padding:12px 16px}
+.oasi-booking-drawer-actions .btn-dark{flex:1.5}
+.oasi-booking-drawer-actions .btn[disabled]{opacity:.62;cursor:wait;transform:none}
+.oasi-booking-drawer .customer-autocomplete{margin:0}
+@media(max-width:600px){.oasi-booking-drawer{width:100%;animation:oasi-booking-drawer-mobile .22s ease-out both}.oasi-booking-drawer-header{padding:22px 20px 18px}.oasi-booking-drawer-header h2{font-size:37px}.oasi-booking-drawer-fields{padding:20px 18px;gap:15px}.oasi-booking-drawer-pair{gap:10px}.oasi-booking-drawer-actions{padding:13px 16px max(17px,env(safe-area-inset-bottom));gap:9px}.oasi-booking-drawer-actions .btn{font-size:12px;padding:12px 8px;min-height:48px}}
+@media(max-width:360px){.oasi-booking-drawer-pair{grid-template-columns:1fr}.oasi-booking-drawer-header h2{font-size:33px}}
+@keyframes oasi-booking-drawer-mobile{from{transform:translateY(20px);opacity:.7}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.oasi-booking-drawer{animation:none!important}}
+@media print{.oasi-booking-drawer-layer{display:none!important}}
