@@ -724,3 +724,363 @@ body.op-drawer-open{overflow:hidden}
     background: #fff;
   }
 }
+/* ========================================================================
+   OASI ADMIN — Restyling coordinato 2026
+   Solo presentazione: nessuna modifica alle chiamate API o ai dati.
+   La sidebar approvata resta invariata. Le regole non alterano la stampa.
+   ======================================================================== */
+@media screen {
+  .admin {
+    --oasi-ink: #27231e;
+    --oasi-muted: #756b61;
+    --oasi-gold: #a3835f;
+    --oasi-line: #e7e0d5;
+    --oasi-soft: #f7f3ec;
+    --oasi-wash: #fbf9f5;
+    --oasi-shadow: 0 12px 38px rgba(58, 42, 22, .038);
+    color: var(--oasi-ink);
+    background: #faf8f4;
+  }
+  .admin-main {
+    width: 100%;
+    min-width: 0;
+    background: radial-gradient(ellipse 80% 420px at 85% 0%,rgba(224,210,190,.16),transparent 82%), #faf8f5;
+    padding-top: 30px;
+    padding-bottom: 60px;
+  }
+  /* Distinct sections instead of tall empty blocks */
+  .admin-main .admin-head {margin: 9px 0 25px;}
+  .admin-main .admin-head .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    color: #9c7853; font-size: 10px; letter-spacing: .22em;
+  }
+  .admin-main .admin-head h1 {
+    font-family: 'Cormorant Garamond',Georgia,serif;
+    font-weight: 500;
+    font-size: clamp(42px, 4.15vw, 63px);
+    line-height: 1.03; letter-spacing: -.033em;
+    margin: 11px 0 11px; color: #29221b;
+  }
+  .admin-main .admin-head p {
+    font-size: 14px; line-height: 1.7; color: #81766c;
+    max-width: 760px;
+  }
+  /* A single precise card system across the admin */
+  .admin-main .panel {
+    border: 1px solid var(--oasi-line);
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: var(--oasi-shadow);
+    padding: clamp(20px, 2.15vw, 29px);
+    margin-bottom: 19px;
+  }
+  .admin-main .panel h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(25px, 2.25vw, 32px);
+    line-height: 1.15; font-weight: 500;
+    letter-spacing: -.017em; color: #2b241d;
+  }
+  .admin-main .panel h4 {color: #302820;}
+  .admin-main p {line-height: 1.63;}
+  /* Toolbar / global search */
+  .admin-main .oasi-admin-tools {
+    background: rgba(255,255,255,.95);
+    box-shadow: 0 5px 20px rgba(58,42,22,.035);
+    padding: 9px; border-radius: 17px;
+    gap: 8px; border: 1px solid var(--oasi-line);
+    margin-bottom: 25px;
+  }
+  .admin-main .oasi-admin-tools button {
+    border: 1px solid #e9e1d7;
+    border-radius: 11px; background: #fbf9f5;
+    color: #3a322b; font-size: 13px; font-weight: 600;
+    transition: background .14s ease, border-color .14s ease, transform .14s ease;
+  }
+  .admin-main .oasi-admin-tools button:hover {background:#f2ebe1;border-color:#d8c5ad; transform:translateY(-1px);}
+  .admin-main .oasi-tool-search {background:#f9f6f1!important;max-width:none!important;}
+  .admin-main .oasi-admin-tools kbd {background:white;color:#827468;}
+  /* Consistent inputs and semantic focus */
+  .admin-main label {color:#60564d;font-size:12px;letter-spacing:.015em;line-height:1.45;}
+  .admin-main input:not([type=checkbox]):not([type=file]),
+  .admin-main select,.admin-main textarea {
+    border-radius: 12px;
+    border: 1px solid #e0d6c9;
+    background: #fffdfa;
+    color: #2a241d;
+    min-height: 46px;
+    padding: 11px 13px;
+    box-shadow: none;
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  .admin-main input:focus-visible,.admin-main select:focus-visible,.admin-main textarea:focus-visible,
+  .admin-main button:focus-visible,.admin-main a:focus-visible {
+    outline: 2px solid #a78156;
+    outline-offset: 2px;
+  }
+  .admin-main input:not([type=checkbox]):not([type=file]):focus,
+  .admin-main select:focus,.admin-main textarea:focus {
+    border-color: #a88b69; background: #fff;
+    box-shadow: 0 0 0 3px rgba(168,139,105,.1);
+  }
+  .admin-main input::placeholder,.admin-main textarea::placeholder{color:#a69c91;}
+  /* Buttons unify interactive components while retaining function */
+  .admin-main .btn {
+    border-radius: 13px; min-height: 46px;
+    padding: 13px 20px; font-size: 13px; font-weight: 650;
+    gap: 14px;
+    transition: transform .15s ease,box-shadow .15s ease,background .15s ease;
+  }
+  .admin-main .btn-dark {
+    background: #292622; border-color: #292622; color: #fff;
+    box-shadow: 0 5px 12px rgba(36,30,23,.09);
+  }
+  .admin-main .btn-dark:hover {background:#43392e; transform:translateY(-1px);box-shadow:0 8px 19px rgba(36,30,23,.14);}
+  .admin-main .btn-outline,.admin-main .btn-light {
+    color:#473a2d;border-color:#d9caba;background:#fff;
+  }
+  .admin-main .btn-outline:hover {background:#f8f1e8;}
+  .admin-main .mini {
+    background:#fffdfa;border:1px solid #dfd3c4;
+    border-radius: 10px; min-height: 36px;
+    padding: 8px 12px; font-size:12px;font-weight:600;color:#594a3b;
+    transition: background .15s,border-color .15s;
+  }
+  .admin-main .mini:hover {background:#f5ede2;border-color:#c8ac8c;}
+  .admin-main .mini.danger {color:#a24747;background:#fffafa;border-color:#efd2cd;}
+  /* KPI cards and daily service visual hierarchy */
+  .admin-main .op-toolbar {
+    border-radius: 19px;background:#fff;box-shadow:var(--oasi-shadow);
+    border-color:var(--oasi-line);padding:18px 20px;gap:12px;
+  }
+  .admin-main .op-kpis {gap:12px;margin:0 0 19px;}
+  .admin-main .op-kpis article {
+    min-width:0; min-height: 124px;
+    border-radius: 19px;
+    border:1px solid #e7ddcf;
+    box-shadow:0 9px 28px rgba(63,47,28,.035);
+    padding:18px 18px 17px;
+    background:linear-gradient(157deg,#fff 58%,#fbf7ef);
+  }
+  .admin-main .op-kpis article span {
+    color: #776b60; font-size: 12px;
+    font-weight: 600; line-height:1.45;
+  }
+  .admin-main .op-kpis article strong {
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:47px;line-height:.97; font-weight:600;
+    color:#30261d; letter-spacing:-.04em;
+  }
+  .admin-main .op-kpis article:first-child {border-top:3px solid #ae8960;}
+  .admin-main .op-dashboard-grid {gap:18px;}
+  .admin-main .op-dashboard-grid>.panel,
+  .admin-main .op-service-layout>.panel,
+  .admin-main .op-service-list {
+    padding:clamp(20px,2vw,27px)!important;
+    border-radius:22px!important;
+  }
+  .admin-main .op-panel-heading {
+    gap:14px; align-items:flex-start;
+    border-bottom: 1px solid #f0eae3;
+    padding-bottom: 14px; margin-bottom:18px;
+  }
+  .admin-main .op-panel-heading h3 {font-size:30px;}
+  .admin-main .op-panel-heading .mini {white-space:nowrap;}
+  .admin-main .op-arrival {border-bottom-color:#eee8df;}
+  .admin-main .op-arrival time {
+    color:#8e6b42; background:#faf4ec;border-radius:9px;
+    padding:7px 10px;font-weight:700;
+  }
+  .admin-main .op-service-stats>div {
+    background:#faf6ef;border:1px solid #eee3d4;
+    border-radius:14px;padding:18px;
+  }
+  .admin-main .op-action-grid{gap:13px;}
+  .admin-main .op-quick {
+    border-radius:18px; padding:21px;
+    background:linear-gradient(145deg,#fff,#fcf9f4);
+    border-color:#e8dfd4;box-shadow:0 8px 22px rgba(52,38,21,.027);
+  }
+  .admin-main .op-quick:hover{border-color:#cbb69d;box-shadow:0 13px 28px rgba(52,38,21,.075);}
+  .admin-main .op-quick strong{font-size:15px;}
+  .admin-main .op-quick small{line-height:1.55;}
+  /* Operational floorplan remains large and legible */
+  .admin-main .op-service-layout {gap:19px;}
+  .admin-main .op-room {
+    border-radius:18px; padding:16px;
+    background:#fcfaf6; border:1px solid #ece1d3;
+  }
+  .admin-main .op-room h4 {margin:0 0 13px;font-size:26px;}
+  .admin-main .op-room-svg {
+    background:#fffcf8;border:1px solid #e4d5c1;
+    box-shadow:none;border-radius:14px;
+  }
+  .admin-main .op-legend {
+    background:#faf6f0;border:1px solid #eee3d5;
+    border-radius:13px;padding:10px 12px;
+  }
+  .admin-main .op-block {
+    border:1px solid #eee2d3;border-radius:13px;background:#fffdf9;
+  }
+  .admin-main .op-block-form {
+    border-bottom:1px solid #eee8df;padding-bottom:16px;margin-bottom:16px;
+  }
+  /* Reservations: form and table share one visual language */
+  .admin-main .reservation-control-panel {
+    padding:26px!important;
+    background:#fff!important;
+    border-radius:22px;
+  }
+  .admin-main .reservation-control-head {
+    align-items:center;gap:17px;
+  }
+  .admin-main .reservation-control-head h3 {margin:5px 0;}
+  .admin-main .reservation-filters {
+    padding:17px;background:#fbf8f3;border:1px solid #eee5d9;
+    border-radius:15px;gap:12px;
+  }
+  .admin-main .reservation-summary {gap:9px;}
+  .admin-main .reservation-summary>span {
+    background:#f7f2eb;border:1px solid #ebdfd0;
+    color:#615448;border-radius:12px;padding:12px 15px;
+  }
+  .admin-main .reservation-print-actions {gap:10px;}
+  .admin-main .reservation-print-actions .btn {border-radius:12px;}
+  .admin-main .reservation-list-panel {overflow:hidden;}
+  .admin-main .reservation-list-panel h3 {margin:0 0 18px;}
+  /* Tables: visible row boundaries, calm header and clear actions */
+  .admin-main .table-scroll {
+    max-width:100%;min-width:0;overflow-x:auto;
+    scrollbar-width:thin;scrollbar-color:#d5c7b5 #faf8f5;
+    border:1px solid #eee7dd;border-radius:14px;
+  }
+  .admin-main table{border-collapse:separate;border-spacing:0;white-space:nowrap;}
+  .admin-main th{
+    background:#f9f5ef;color:#87745f;
+    font-size:11px;font-weight:700;letter-spacing:.065em;
+    text-transform:uppercase;padding:14px 15px;border-bottom:1px solid #ebe1d4;
+  }
+  .admin-main td{
+    font-size:13px;line-height:1.45;
+    color:#43392f;padding:15px;border-bottom:1px solid #f0eae3;
+  }
+  .admin-main tbody tr:last-child td{border-bottom:none;}
+  .admin-main tbody tr:hover td{background:#fdfaf6;}
+  .admin-main td small {font-size:11px;color:#8b8075;}
+  .admin-main .reservation-status {font-weight:700;letter-spacing:.01em;}
+  /* Customer directory, notification feed, audit */
+  .admin-main .customer-search form {gap:12px;}
+  .admin-main .customer-search p {font-size:12px;}
+  .admin-main .customer-card-stats span {
+    border-radius:14px;background:linear-gradient(160deg,#fff,#fbf7f1);
+    border-color:#e9dfd3;padding:16px;
+  }
+  .admin-main .customer-card-stats strong {
+    font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;
+  }
+  .admin-main .phase2-notice {
+    padding:17px 2px;gap:17px;
+    border-bottom:1px solid #eee7de;
+  }
+  .admin-main .phase2-email-state {border-radius:999px;}
+  .admin-main .security-grid {gap:16px;}
+  /* Analytics: consistent grids + charts */
+  .admin-main .analytics-filters {border-radius:21px;}
+  .admin-main .analytics-filters form {gap:13px;}
+  .admin-main .analytics-stat-grid {gap:12px;}
+  .admin-main .analytics-stat {
+    min-width:0;padding:22px;
+    border-radius:18px;
+    border:1px solid #e7ded3;
+    background:linear-gradient(155deg,#fff,#fbf8f3);
+  }
+  .admin-main .analytics-stat small {color:#86786a;font-size:12px;font-weight:600;}
+  .admin-main .analytics-stat strong {
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:clamp(30px,2.55vw,42px);
+    color:#30261f;
+  }
+  .admin-main .analytics-section {
+    border-radius:21px;padding:25px;
+  }
+  .admin-main .analytics-meter-track {height:11px;background:#f1e9df;}
+  .admin-main .analytics-meter-track>div {background:linear-gradient(90deg,#aa845d,#ccb08c);}
+  .admin-main .analytics-peaks>div {border:1px solid #ebe0d3;border-radius:14px;}
+  /* Events and ceremonies */
+  .admin-main .event-controls-head {align-items:center;}
+  .admin-main .event-filter {
+    background:#faf7f2;border:1px solid #eee2d5;
+    padding:15px;border-radius:14px;
+  }
+  .admin-main .event-list {border-radius:22px;}
+  .admin-main .event-note {background:#fff9f1;}
+  /* Traditional CMS forms and floor-plan inspector */
+  .admin-main .floor-layout{gap:18px;}
+  .admin-main .floor-canvas-panel,
+  .admin-main .floor-inspector{border-radius:22px;}
+  .admin-main .form-actions{gap:10px;}
+  .admin-main .gallery-admin{gap:14px;}
+  .admin-main .gallery-admin .panel{border-radius:17px;}
+  /* Drawers: common style without changing semantics or their stacking */
+  .op-drawer,.phase2-drawer {
+    background:#fcfaf7;border-left:1px solid #e7ddcf;
+    box-shadow:-18px 0 70px rgba(35,27,16,.17);
+  }
+  .op-drawer-top,.phase2-drawer-header {
+    border-bottom-color:#e9dfd1;
+  }
+  .op-drawer input,.op-drawer select,.op-drawer textarea,
+  .phase2-drawer input,.phase2-drawer select,.phase2-drawer textarea {
+    border-radius:12px;border-color:#ded1c0;background:#fff;
+  }
+  .op-drawer .btn,.phase2-drawer .btn {border-radius:12px;}
+  /* Desktop density tuning */
+  @media (min-width:901px) {
+    .admin-main{padding-left:clamp(22px,3vw,43px);padding-right:clamp(22px,3vw,43px);}
+  }
+  @media (max-width:1190px) {
+    .admin-main .op-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .admin-main .analytics-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (max-width:900px) {
+    .admin-main .admin-head{margin-top:3px;margin-bottom:19px;}
+    .admin-main .admin-head h1{font-size:clamp(38px,7vw,52px);}
+    .admin-main .op-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .admin-main .op-service-layout{grid-template-columns:1fr;}
+    .admin-main .op-room{padding:11px;}
+  }
+  @media (max-width:650px) {
+    .admin-main {padding-left:12px!important;padding-right:12px!important;}
+    .admin-main .panel {padding:17px;border-radius:17px;margin-bottom:13px;}
+    .admin-main .op-dashboard-grid>.panel,
+    .admin-main .op-service-layout>.panel,
+    .admin-main .op-service-list {padding:16px!important;border-radius:17px!important;}
+    .admin-main .admin-head h1{font-size:41px;}
+    .admin-main .admin-head p{font-size:13px;}
+    .admin-main .oasi-admin-tools{margin-bottom:14px;}
+    .admin-main .op-toolbar {padding:12px;border-radius:15px;gap:8px;}
+    .admin-main .op-kpis {grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+    .admin-main .op-kpis article {min-height:98px;padding:14px;}
+    .admin-main .op-kpis article strong{font-size:36px;}
+    .admin-main .op-panel-heading h3{font-size:27px;}
+    .admin-main .op-room {padding:8px;}
+    .admin-main .op-room h4{font-size:24px;}
+    .admin-main .reservation-control-panel{padding:16px!important;}
+    .admin-main .reservation-filters{padding:12px;}
+    .admin-main .reservation-summary{gap:7px;}
+    .admin-main .reservation-summary>span{padding:10px 12px;font-size:12px;}
+    .admin-main .analytics-section{padding:16px;}
+    .admin-main .analytics-stat{padding:15px;}
+    .admin-main .analytics-stat strong{font-size:31px;}
+    .admin-main .event-filter{padding:12px;}
+    .admin-main .admin-head h1{overflow-wrap:anywhere;}
+  }
+  @media (max-width:375px){
+    .admin-main .op-kpis article strong{font-size:32px;}
+    .admin-main .analytics-stat-grid{grid-template-columns:1fr 1fr;}
+    .admin-main .mini{padding:7px 9px;}
+  }
+  @media (prefers-reduced-motion:reduce) {
+    .admin-main .btn,.admin-main .mini,.admin-main .op-quick,
+    .admin-main input,.admin-main select,.admin-main textarea{transition:none;}
+  }
+}
