@@ -33,7 +33,7 @@ const adminShell=(content,tab='dashboard')=>`<div class="admin"><aside class="si
 // Fase 6 — comandi rapidi, ricerca e navigazione mobile (solo sessione ADMIN).
 const adminNavItems=[['dashboard','Panoramica'],['service','Servizio e sala'],['reservations','Prenotazioni'],['customers','Clienti'],['analytics','Statistiche e report'],['events','Eventi e cerimonie'],['notifications','Notifiche'],['emails','Email'],['security','Sicurezza e registro'],['floor','Piantina tavoli'],['rooms','Sale e ambienti'],['menu','Menù digitale'],['gallery','Galleria'],['site','Contenuti e contatti'],['faq','Domande frequenti'],['booking','Orari e regole']];
 const adminMobileItems=[['dashboard','Home','⌂'],['service','Sala','▦'],['reservations','Agenda','▤'],['customers','Clienti','♙'],['events','Eventi','◇']];
-const adminTools=()=>`<div class="oasi-admin-tools" role="toolbar" aria-label="Azioni rapide ADMIN"><button type="button" class="oasi-tool-search" id="admin-search-open" aria-label="Cerca clienti e prenotazioni">⌕ <span>Cerca cliente o prenotazione</span> <kbd>/</kbd></button><button type="button" id="admin-shortcut-new" aria-label="Nuova prenotazione">＋ <span>Nuova prenotazione</span></button><button type="button" id="admin-shortcut-refresh" aria-label="Aggiorna dati">↻ <span>Aggiorna</span></button></div>`;
+const adminTools=()=>`<div class="oasi-admin-tools" role="toolbar" aria-label="Azioni rapide ADMIN"><button type="button" class="oasi-tool-search" id="admin-search-open" aria-label="Cerca clienti e prenotazioni">⌕ <span>Cerca cliente o prenotazione</span> <kbd>/</kbd></button><button type="button" id="admin-shortcut-new" aria-label="Nuova prenotazione">＋ <span>Nuova prenotazione</span></button><button type="button" id="admin-shortcut-refresh" aria-label="Aggiorna dati">↻ <span>Aggiorna</span></button><small id="oasi-poll-status" aria-live="off" style="font-size:11px;opacity:.7;white-space:nowrap">Sincronizzazione ogni 30 s</small></div>`;
 const adminMobileNav=tab=>`<nav class="oasi-mobile-nav" aria-label="Navigazione rapida ADMIN">${adminMobileItems.map(([key,label,symbol])=>`<button type="button" data-admin-goto="${key}" class="${tab===key?'active':''}" ${tab===key?'aria-current="page"':''}><span class="oasi-nav-symbol" aria-hidden="true">${symbol}</span><span>${label}</span></button>`).join('')}</nav>`;
 async function adminGoTo(tab,openNew=false){
  if(!adminNavItems.some(([key])=>key===tab))return;
@@ -137,7 +137,61 @@ function bindFloorZoom(){if(!$('#floor-board'))return;
  $('#floor-zoom-fit')?.addEventListener('click',()=>{floorZoom.mode='fit';applyFloorZoom()});
  requestAnimationFrame(applyFloorZoom);
 }
-async function loadAdmin(){try{await api('admin/me');state.user=true}catch{state.user=false}if(!state.user){root.innerHTML=`<main class="login-wrap"><div class="login-card"><img src="/logo-oasi.png" alt="Oasi"/><div class="eyebrow">AREA RISERVATA</div><h1>Benvenuto.</h1><p>Inserisci la password riservata per accedere al gestionale.</p><form id="login"><label>Password<input type="password" name="password" autocomplete="current-password" required autofocus/></label><button class="btn btn-dark full">Accedi <svg class="oasi-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M8 5h11v11"/></svg></button></form><p class="tiny"><a href="/">← Torna al sito</a></p></div></main>`;$('#login').onsubmit=async e=>{e.preventDefault();try{await api('admin/login','POST',inputData(e.target));state.user=true;renderAdmin()}catch(x){msg(x.message,'error')}};return}renderAdmin()}
+// Solo sincronizzazione prenotazioni: nessun suono, avviso esterno o servizio email.
+const oasiReservationSync={timer:null,busy:false,key:'',signature:null,failures:0};
+const oasiSyncViews=new Set(['dashboard','service','reservations']);
+function oasiSyncPeriod(){
+ if(!oasiSyncViews.has(state.adminView))return null;
+ const service=state.adminView==='reservations'?(state.reservationService||'all'):(state.opsService||'lunch');
+ return {key:`${state.adminView}:${state.date}:${service}`,date:state.date,service};
+}
+function oasiSyncSignature(rows){return JSON.stringify(rows.map(r=>[
+  r.id,r.status,r.visit_state,r.date,r.service,r.time,r.party_size,r.name,r.phone,r.email,
+  r.notes,r.room_id,r.table_ids,r.table_codes,r.updated_at
+ ]).sort((a,b)=>Number(a[0])-Number(b[0])))}
+function oasiSyncSafeToRender(){
+ if(!state.user||location.pathname!=='/admin'||document.hidden||!oasiSyncViews.has(state.adminView))return false;
+ if(document.querySelector('.oasi-search-overlay,.phase2-drawer-wrap,.event-drawer-backdrop,.op-drawer-layer,.floor-inspector-backdrop,.oasi-print-sheet'))return false;
+ if(document.body.classList.contains('floor-panel-open')||document.querySelector('#edit-area form'))return false;
+ if(document.querySelector('form:focus-within,[contenteditable="true"]:focus'))return false;
+ return true;
+}
+function oasiSyncStatus(label){const el=document.getElementById('oasi-poll-status');if(el)el.textContent=label}
+async function oasiSyncTick(){
+ if(oasiReservationSync.busy||!oasiSyncSafeToRender())return;
+ const period=oasiSyncPeriod();if(!period)return;
+ oasiReservationSync.busy=true;
+ try{
+  const q=new URLSearchParams({date:period.date,service:period.service});
+  const rows=await api('admin/reservations?'+q.toString());
+  if(!Array.isArray(rows))throw Error('Elenco prenotazioni non valido');
+  if(!oasiSyncSafeToRender()||oasiSyncPeriod()?.key!==period.key)return;
+  const signature=oasiSyncSignature(rows);
+  if(oasiReservationSync.key!==period.key){
+   oasiReservationSync.key=period.key;oasiReservationSync.signature=signature;
+  }else if(oasiReservationSync.signature!==null&&oasiReservationSync.signature!==signature){
+   const y=window.scrollY;
+   // Non sovrascrivere moduli o pannelli aperti; ricontrolla dopo 30 secondi.
+   if(!oasiSyncSafeToRender())return;
+   oasiReservationSync.signature=signature;
+   await renderAdmin();
+   window.scrollTo(0,y);
+  }
+  oasiReservationSync.failures=0;
+  oasiSyncStatus('Aggiornato ' +new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+ }catch(e){
+  oasiReservationSync.failures++;
+  oasiSyncStatus('Sincronizzazione non riuscita · premi Aggiorna');
+  if(oasiReservationSync.failures===1)console.warn('Oasi: sincronizzazione prenotazioni non riuscita',e);
+ }finally{oasiReservationSync.busy=false}
+}
+function oasiStartReservationSync(){
+ if(oasiReservationSync.timer||location.pathname!=='/admin'||!state.user)return;
+ oasiReservationSync.timer=setInterval(oasiSyncTick,30000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)oasiSyncTick()});
+ oasiSyncTick();
+}
+async function loadAdmin(){try{await api('admin/me');state.user=true}catch{state.user=false}if(!state.user){root.innerHTML=`<main class="login-wrap"><div class="login-card"><img src="/logo-oasi.png" alt="Oasi"/><div class="eyebrow">AREA RISERVATA</div><h1>Benvenuto.</h1><p>Inserisci la password riservata per accedere al gestionale.</p><form id="login"><label>Password<input type="password" name="password" autocomplete="current-password" required autofocus/></label><button class="btn btn-dark full">Accedi <svg class="oasi-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M8 5h11v11"/></svg></button></form><p class="tiny"><a href="/">← Torna al sito</a></p></div></main>`;$('#login').onsubmit=async e=>{e.preventDefault();try{await api('admin/login','POST',inputData(e.target));state.user=true;renderAdmin().then(oasiStartReservationSync)}catch(x){msg(x.message,'error')}};return}renderAdmin().then(oasiStartReservationSync)}
 const opLabel={expected:'In attesa',arrived:'Arrivato',seated:'Al tavolo',finished:'Terminato',no_show:'Non presentato'};
 const opServiceLabel=key=>key==='lunch'?'Pranzo':'Cena';
 const operationalStats=(data,svc)=>{const reservations=data.reservations.filter(r=>r.status==='confirmed'&&(svc==='all'||r.service===svc));const byState=k=>reservations.filter(r=>r.visit_state===k).length;const blocked=(data.blocks||[]).filter(b=>svc==='all'||b.service===svc);const assigned=new Set(reservations.flatMap(r=>String(r.table_ids||'').split(',').map(Number)));const blockedRooms=new Set(blocked.filter(b=>b.scope==='room').map(b=>Number(b.target_id)));const blockedTables=new Set(blocked.filter(b=>b.scope==='table').map(b=>Number(b.target_id)));const allClosed=blocked.some(b=>b.scope==='service');const availableTables=(data.tables||[]).filter(t=>t.enabled&&!assigned.has(Number(t.id))&&!blockedRooms.has(Number(t.room_id))&&!blockedTables.has(Number(t.id))&&!allClosed&&((data.rooms||[]).find(r=>r.id===t.room_id)?.internal_enabled!==0)).length;return {availableTables,reservations,bookings:reservations.length,covers:reservations.reduce((n,r)=>n+Number(r.party_size||0),0),waiting:byState('expected'),arrived:byState('arrived'),seated:byState('seated'),finished:byState('finished'),noShow:byState('no_show'),blocked};};
@@ -250,7 +304,7 @@ if(tab==='menu'){state.menu=await api('admin/menu');html=heading('Menù digitale
 if(tab==='gallery'){state.gallery=await api('admin/gallery');html=heading('Galleria','Aggiungi fotografie e ambienti.')+`<button class="btn btn-dark" id="new-gallery">+ Aggiungi foto</button><div id="edit-area"></div><div class="gallery-admin">${state.gallery.map(x=>`<article class="panel"><img src="${esc(x.image_url)}" alt=""/><h3>${esc(x.caption)}</h3><button class="mini" data-edit-gallery="${x.id}">Modifica</button> <button class="mini danger" data-delete-gallery="${x.id}">Elimina</button></article>`).join('')}</div>`}
 if(tab==='faq'){const cfg=await api('admin/settings');const configured=cfg.site?.faqs;state.settings=cfg;const items=Array.isArray(configured)?configured:defaultFaqs;html=heading('Domande frequenti','Aggiungi, modifica, riordina o elimina le risposte che compaiono nella homepage.')+`<section class="panel"><div class="faq-admin-toolbar"><h3>FAQ homepage</h3><button class="mini" id="faq-add">+ Aggiungi domanda</button></div><form id="faq-admin-form"><div id="faq-admin-items">${items.map((q,i)=>`<div class="faq-admin-row"><label>Domanda<input name="question" maxlength="220" required value="${esc(q.question)}"></label><label>Risposta<textarea name="answer" maxlength="1500" rows="3" required>${esc(q.answer)}</textarea></label><button type="button" class="mini danger faq-remove">Elimina</button></div>`).join('')}</div><button class="btn btn-dark" type="submit">Salva le FAQ</button></form></section>`}
 if(tab==='site'||tab==='booking'){const cfg=await api('admin/settings');const d=cfg[tab];if(tab==='site')html=heading('Contenuti e contatti','Personalizza la storia e le informazioni del ristorante.')+sectionForm('Contenuti del sito',fields([['subtitle','Sottotitolo homepage'],['story','La nostra storia','textarea'],['heroImage','Fotografia copertina (URL)'],['storyImage','Fotografia Chi siamo (URL)'],['address','Indirizzo'],['phone','Telefono'],['instagram','Instagram'],['facebook','Facebook'],['tiktok','TikTok']],d));else html=heading('Orari e regole','Configura separatamente pranzo, cena e chiusure.')+sectionForm('Impostazioni prenotazione',fields([['lunchStart','Pranzo da','time'],['lunchLast','Pranzo ultimo arrivo','time'],['dinnerStart','Cena da','time'],['dinnerLast','Cena ultimo arrivo','time'],['maxOnline','Massimo persone online','number'],['maxDaysAhead','Giorni prenotabili in anticipo','number'],['minNoticeMinutes','Preavviso minimo (minuti)','number'],['closedDates','Date di chiusura (AAAA-MM-GG separate da virgola)']],{lunchStart:d.lunch.start,lunchLast:d.lunch.last,dinnerStart:d.dinner.start,dinnerLast:d.dinner.last,maxOnline:d.maxOnline,maxDaysAhead:d.maxDaysAhead,minNoticeMinutes:d.minNoticeMinutes,closedDates:d.closedDates.join(', ')}));state.settings=cfg}
-root.innerHTML=adminShell(html,tab);bindAdmin();bindAdminTools();if(tab==='analytics')bindAnalytics();if(tab==='events')bindEvents();if(tab==='security')$('#security-revoke')?.addEventListener('click',async()=>{if(!confirm('Disconnettere tutte le sessioni, inclusa questa?'))return;try{await api('admin/security/sessions','DELETE',{});location.href='/admin'}catch(e){msg(e.message,'error')}});api('admin/notifications?count=1').then(x=>{const count=Number(x.unread||0);const item=document.querySelector('.sidebar [data-tab="notifications"]');const mobile=document.querySelector('#mobile-tab [value="notifications"]');if(count&&item){const badge=document.createElement('span');badge.className='oasi-notification-count';badge.textContent=count>99?'99+':String(count);item.append(badge)}if(mobile)mobile.textContent='Notifiche'+(count?' ('+count+')':'')}).catch(()=>{});if(tab==='floor')bindFloorZoom();if(tab==='site')enableImageUpload($('#editor-form')?.closest('.panel'));}catch(e){root.innerHTML=adminShell(heading('Errore',esc(e.message))+'<button class="btn btn-dark" id="retry">Riprova</button>',tab);bindAdmin();bindAdminTools();$('#retry')?.addEventListener('click',renderAdmin)}}
+root.innerHTML=adminShell(html,tab);bindAdmin();bindAdminTools();oasiSyncStatus('Sincronizzazione ogni 30 s');if(tab==='analytics')bindAnalytics();if(tab==='events')bindEvents();if(tab==='security')$('#security-revoke')?.addEventListener('click',async()=>{if(!confirm('Disconnettere tutte le sessioni, inclusa questa?'))return;try{await api('admin/security/sessions','DELETE',{});location.href='/admin'}catch(e){msg(e.message,'error')}});api('admin/notifications?count=1').then(x=>{const count=Number(x.unread||0);const item=document.querySelector('.sidebar [data-tab="notifications"]');const mobile=document.querySelector('#mobile-tab [value="notifications"]');if(count&&item){const badge=document.createElement('span');badge.className='oasi-notification-count';badge.textContent=count>99?'99+':String(count);item.append(badge)}if(mobile)mobile.textContent='Notifiche'+(count?' ('+count+')':'')}).catch(()=>{});if(tab==='floor')bindFloorZoom();if(tab==='site')enableImageUpload($('#editor-form')?.closest('.panel'));}catch(e){root.innerHTML=adminShell(heading('Errore',esc(e.message))+'<button class="btn btn-dark" id="retry">Riprova</button>',tab);bindAdmin();bindAdminTools();$('#retry')?.addEventListener('click',renderAdmin)}}
 
 const menuFields=[['section','Sezione: piatti, pizze, vini'],['category','Categoria'],['name','Nome'],['description','Descrizione','textarea'],['price','Prezzo (es. € 12,00)'],['allergens','Allergeni'],['image_url','URL foto'],['region','Regione vino'],['winery','Cantina'],['vintage','Annata'],['sort_order','Ordine','number'],['available','Disponibile','checkbox']];
 const galleryFields=[['image_url','URL immagine'],['caption','Didascalia'],['category','Categoria'],['sort_order','Ordine','number']];
