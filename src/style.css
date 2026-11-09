@@ -535,3 +535,192 @@ body.op-drawer-open{overflow:hidden}
  .sidebar button:focus-visible,.sidebar a:focus-visible,.sidebar summary:focus-visible{outline:2px solid #b49469;outline-offset:2px}
 }
 @media print{.sidebar{display:none!important}}
+
+
+/* --- Sidebar refinement v2 --- */
+@media (min-width: 901px){
+  .admin{
+    grid-template-columns: 296px minmax(0,1fr);
+  }
+  .sidebar{
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
+    padding: 18px 16px 16px;
+    background: linear-gradient(180deg,#fcfbf8 0%,#ffffff 100%);
+    display: grid;
+    grid-template-rows: auto minmax(0,1fr) auto;
+    gap: 12px;
+    border-right: 1px solid #ece4d8;
+    box-shadow: inset -1px 0 0 rgba(255,255,255,.7);
+  }
+  .oasi-side-head{
+    margin: 0;
+    padding: 6px 8px 14px;
+    border-bottom: 1px solid #efe7dc;
+  }
+  .sidebar .side-brand{
+    margin: 0 0 14px;
+  }
+  .sidebar .side-brand img{
+    width: 122px;
+    max-height: 64px;
+  }
+  .oasi-side-eyebrow{
+    font-size: 10px;
+    letter-spacing: .22em;
+    color: #a6845f;
+    margin-bottom: 12px;
+  }
+  .oasi-side-admin{
+    min-height: 38px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    background: #f8f4ee;
+    border: 1px solid #ece2d5;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5f564d;
+  }
+  .oasi-side-status{
+    width: 8px;
+    height: 8px;
+    box-shadow: 0 0 0 4px #e3efe7;
+  }
+  .oasi-side-nav{
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: #d7c7b2 transparent;
+  }
+  .oasi-side-nav::-webkit-scrollbar{
+    width: 8px;
+  }
+  .oasi-side-nav::-webkit-scrollbar-thumb{
+    background: #d7c7b2;
+    border-radius: 999px;
+  }
+  .oasi-side-nav::-webkit-scrollbar-track{
+    background: transparent;
+  }
+  .oasi-side-group{
+    margin: 0 0 12px;
+    padding: 6px;
+    border: 1px solid #efe7dc;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 10px 22px rgba(81,58,34,.04);
+  }
+  .oasi-side-group > summary{
+    min-height: 42px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    color: #9d7a50;
+    font-size: 11px;
+    letter-spacing: .18em;
+    background: transparent;
+  }
+  .oasi-side-group > summary:hover{
+    background: #fbf7f1;
+  }
+  .oasi-side-chevron{
+    width: 16px;
+    height: 16px;
+    color: #b09a82;
+  }
+  .oasi-side-group-links{
+    padding: 4px 0 2px;
+  }
+  .sidebar .side-item{
+    min-height: 50px;
+    padding: 13px 14px;
+    margin: 3px 0;
+    gap: 13px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #5f554a;
+    background: transparent;
+  }
+  .sidebar .side-item:hover{
+    background: #f8f2ea;
+    color: #2c241d;
+  }
+  .sidebar .side-item.active{
+    background: #efe5d7;
+    color: #221c16;
+    font-weight: 700;
+    box-shadow: inset 4px 0 0 #ab8455;
+  }
+  .oasi-side-icon{
+    width: 19px;
+    height: 19px;
+    color: #9b846a;
+  }
+  .sidebar .side-item.active .oasi-side-icon{
+    color: #8b6942;
+  }
+  .oasi-side-text{
+    font-size: 15px;
+    line-height: 1.25;
+  }
+  .oasi-notification-count{
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: auto;
+  }
+  .oasi-side-footer{
+    margin-top: 0;
+    padding: 4px 0 0;
+    border-top: 1px solid #efe7dc;
+    display: grid;
+    gap: 8px;
+  }
+  .oasi-side-footer-link{
+    min-height: 46px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #ece4d8;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    color: #5f554a;
+    box-shadow: 0 8px 20px rgba(81,58,34,.03);
+  }
+  .oasi-side-footer-link:hover{
+    background: #f8f2ea;
+    color: #241e17;
+  }
+  .oasi-side-logout{
+    color: #825d54;
+  }
+  .admin-main{
+    padding-left: clamp(24px,3vw,42px);
+  }
+}
+
+@media (max-width: 900px){
+  .admin-mobile{
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    background: rgba(250,248,245,.96);
+    backdrop-filter: blur(8px);
+    padding: 12px 0 16px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee5d9;
+  }
+  .admin-mobile select{
+    border-radius: 14px;
+    min-height: 46px;
+    border-color: #decfbc;
+    background: #fff;
+  }
+}
