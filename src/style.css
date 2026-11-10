@@ -1244,3 +1244,109 @@ body.oasi-booking-drawer-open{overflow:hidden}
   .admin-main .event-filter input[type="date"]{padding-left:6px;padding-right:6px;font-size:15px;}
   .admin-main .admin-head h1{font-size:35px;}
 }
+
+
+/* OASI ADMIN – Mobile layout V2: iPhone/Safari native controls, true one-column forms */
+@media screen and (max-width: 760px) {
+  .admin { display:block; width:100%; min-width:0; }
+  .admin .admin-main { width:100%; min-width:0; padding:12px 14px calc(102px + env(safe-area-inset-bottom))!important; }
+  .admin .admin-main .admin-head {margin:15px 0 20px;}
+  .admin .admin-main .admin-head h1 {font-size:clamp(36px,9vw,46px);line-height:1.05;overflow-wrap:anywhere;}
+  .admin .admin-main .admin-head p {font-size:14px;line-height:1.55;}
+  .admin .admin-main :is(.op-toolbar,.event-filter,.reservation-filters,.analytics-filters form) {
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:12px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  .admin .admin-main .op-toolbar,
+  .admin .admin-main .event-filter {padding:14px!important;}
+  .admin .admin-main :is(.op-toolbar,.event-filter,.reservation-filters,.analytics-filters form) > label {
+    display:flex!important;
+    flex-direction:column!important;
+    flex:0 0 auto!important;
+    grid-column:1/-1!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    margin:0!important;
+    gap:7px;
+  }
+  .admin .admin-main :is(.op-toolbar,.event-filter,.reservation-filters,.analytics-filters form) :is(input,select) {
+    display:block!important;
+    box-sizing:border-box!important;
+    flex:none!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    height:50px!important;
+    min-height:50px!important;
+    margin:0!important;
+    padding:10px 12px!important;
+    font-size:16px!important;
+    line-height:normal!important;
+    border-radius:12px;
+  }
+  .admin .admin-main :is(.op-toolbar,.event-filter,.reservation-filters,.analytics-filters form) input[type=date] {
+    display:block!important;
+    -webkit-appearance:none;
+    appearance:none;
+    text-align:left;
+    max-inline-size:100%;
+  }
+  .admin .admin-main :is(.op-toolbar,.event-filter,.reservation-filters,.analytics-filters form) input[type=date]::-webkit-date-and-time-value {
+    text-align:left;
+    min-height:1.3em;
+  }
+  .admin .admin-main :is(.op-toolbar,.event-filter,.reservation-filters,.analytics-filters form) > button {
+    display:flex!important;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    min-height:46px!important;
+    margin:0!important;
+    white-space:normal;
+  }
+  /* Compact filter action buttons may share a row only on larger handsets */
+  .admin .admin-main .op-toolbar .mini,
+  .admin .admin-main .event-filter .mini {border-radius:12px;}
+  .admin .admin-main .event-controls-head {display:flex!important;flex-direction:column!important;gap:13px!important;align-items:stretch!important;}
+  .admin .admin-main .event-controls-head > * {min-width:0!important;max-width:100%!important;}
+  .admin .admin-main .event-controls-head .btn {width:100%!important;justify-content:center!important;}
+  .admin .admin-main .event-pills {gap:8px;}
+  .admin .admin-main .event-pills span {font-size:12px;min-width:0;}
+  .admin .admin-main .event-list .event-row {display:grid;grid-template-columns:minmax(0,1fr);gap:12px;}
+  .admin .admin-main .event-date,
+  .admin .admin-main .event-details {max-width:100%;min-width:0;overflow-wrap:anywhere;}
+  /* Fullscreen booking drawer: one field per row, no Safari input overflow */
+  .oasi-booking-drawer-layer {width:100vw;max-width:100vw;overflow:hidden;}
+  .oasi-booking-drawer {width:100vw!important;max-width:100vw!important;min-width:0!important;height:100dvh!important;}
+  .oasi-booking-drawer-header {flex:0 0 auto;padding:18px 17px 14px!important;}
+  .oasi-booking-drawer-header h2 {font-size:clamp(32px,8.5vw,39px)!important;line-height:1.04!important;margin:9px 0 8px!important;}
+  .oasi-booking-drawer-header p {font-size:12px!important;line-height:1.45!important;}
+  .oasi-booking-drawer-fields {width:100%;min-width:0;padding:16px 16px 22px!important;gap:14px!important;overflow-x:hidden;}
+  .oasi-booking-drawer-pair {display:flex!important;flex-direction:column!important;gap:14px!important;width:100%;min-width:0!important;}
+  .oasi-booking-drawer-pair > label,
+  .oasi-booking-drawer-fields > label {display:flex!important;flex-direction:column!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;}
+  .oasi-booking-drawer-fields :is(input,select,textarea) {display:block!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;font-size:16px!important;min-height:50px!important;padding:11px 12px!important;border-radius:12px;}
+  .oasi-booking-drawer-fields input[type=date],
+  .oasi-booking-drawer-fields input[type=time] {-webkit-appearance:none;appearance:none;max-inline-size:100%;text-align:left;}
+  .oasi-booking-drawer-fields input[type=date]::-webkit-date-and-time-value,
+  .oasi-booking-drawer-fields input[type=time]::-webkit-date-and-time-value {text-align:left;min-height:1.3em;}
+  .oasi-booking-drawer-actions {flex:0 0 auto;padding:11px 14px max(16px,env(safe-area-inset-bottom))!important;gap:9px!important;}
+  .oasi-booking-drawer-actions .btn {min-width:0!important;overflow-wrap:break-word;white-space:normal;font-size:13px!important;}
+  .admin .admin-main :is(.panel,.op-service-layout,.op-dashboard-grid,.op-kpis,.event-list) {max-width:100%;min-width:0;}
+  .admin .admin-main .table-scroll {max-width:100%;overflow-x:auto;}
+}
+@media screen and (max-width: 380px){
+  .admin .admin-main {padding-left:10px!important;padding-right:10px!important;}
+  .admin .admin-main .admin-head h1 {font-size:35px;}
+  .admin .admin-main .event-filter,
+  .admin .admin-main .op-toolbar {padding:12px!important;}
+}
