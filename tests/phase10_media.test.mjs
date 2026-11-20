@@ -1,0 +1,13 @@
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+const src=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+const state={data:{site:{},gallery:[],menuPdf:true}};
+const code=src.slice(src.indexOf('const esc='),src.indexOf('const inputData='))+ '\n' +src.slice(src.indexOf('const eventsPage='),src.indexOf('function renderPublic'));
+const ctx={state,URL,location:{origin:'https://oasi.test'},document:{},window:{}};
+const m=runInNewContext(code+'\n({mediaGroups,mediaValue,mediaUrl,mediaEditor,home,aboutPage,book,menupage,eventsPage,photosPreview,nav,footer})',ctx);
+const keys=m.mediaGroups.flatMap(x=>x[1].map(y=>y[0]));
+test('all 18 image slots are independent and have admin fields',()=>{assert.equal(keys.length,18);assert.equal(new Set(keys).size,18);const html=m.mediaEditor({});for(const k of keys)assert.ok(html.includes(`name="${k}"`),k)});
+test('each photo is mapped to its actual public page',()=>{state.data.site=Object.fromEntries(keys.map(k=>[k,`/api/media/${k}.png`]));for(const [fn,ks] of [[m.home,['heroImage','homeStoryImage','homeFoodImage','homeEventImage','homeGallery1','homeGallery2','homeGallery3']],[m.aboutPage,['storyImage']],[m.book,['bookingImage']],[m.menupage,['foodImage']],[m.eventsPage,['eventImage','eventStoryImage','eventWeddingImage','eventCeremonyImage','eventPrivateImage']],[m.nav,['logoMain']],[m.footer,['logoFooter']]]){const html=fn();for(const k of ks)assert.ok(html.includes(`/api/media/${k}.png`),k)}assert.ok(m.menupage().includes('/api/menu-pdf?download=1'))});
+test('preserve legacy images until explicitly removed, reject unsafe URLs',()=>{state.data.site={storyImage:'/api/media/legacy.png'};assert.ok(m.home().includes('/api/media/legacy.png'));assert.ok(m.mediaEditor(state.data.site).includes('/api/media/legacy.png'));state.data.site.homeStoryImage='';assert.ok(!m.home().includes('/api/media/legacy.png'));assert.equal(m.mediaUrl('javascript:alert(1)'),'');assert.equal(m.mediaUrl('/api/media/test.png'),'/api/media/test.png')});
