@@ -274,6 +274,19 @@ if(resource==='security')return securityRoute(ctx,parts,method,b,user);
 if(resource==='events')return eventsAdmin(ctx,parts,method,b);
 if(resource==='me')return json({user});
 if(resource==='logout'&&method==='POST'){const token=(ctx.request.headers.get('cookie')||'').match(/oasi_session=([a-f0-9]+)/)?.[1];if(token)await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(token)).run();return json({ok:true},200,{'set-cookie':'oasi_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'})}
+if(resource==='calendar'&&method==='GET'){
+ const q=new URL(ctx.request.url).searchParams,start=q.get('start'),end=q.get('end');
+ if(!start||!end||!dateOk(start)||!dateOk(end)||start>end||(Date.parse(end)-Date.parse(start))/86400000>41)return fail('Intervallo calendario non valido (massimo 42 giorni)');
+ const selected=q.get('selected')||start;if(!dateOk(selected)||selected<start||selected>end)return fail('Giorno selezionato fuori intervallo');
+ const [reservations,events,blocks,settings,details]=await db.batch([
+ db.prepare(`SELECT book_date,service,status,COUNT(*) bookings,SUM(party_size) covers FROM reservations WHERE book_date BETWEEN ? AND ? GROUP BY book_date,service,status ORDER BY book_date,service,status`).bind(start,end),
+ db.prepare(`SELECT e.id,e.title,e.start_date,e.end_date,e.service,e.status,e.guests,(SELECT GROUP_CONCAT(r.name, ', ') FROM oasi_event_rooms er JOIN rooms r ON r.id=er.room_id WHERE er.event_id=e.id) room_names FROM oasi_private_events e WHERE e.end_date>=? AND e.start_date<=? AND e.status<>'cancelled' ORDER BY e.start_date,e.id`).bind(start,end),
+ db.prepare(`SELECT b.*,CASE WHEN b.scope='room' THEN (SELECT name FROM rooms WHERE id=b.target_id) WHEN b.scope='table' THEN (SELECT code FROM tables WHERE id=b.target_id) ELSE '' END target_name FROM service_blocks b WHERE book_date BETWEEN ? AND ? ORDER BY book_date,service,scope,id`).bind(start,end),
+ db.prepare("SELECT value FROM settings WHERE key='booking'"),
+ db.prepare(`SELECT r.id,r.name,r.time,r.service,r.party_size,r.status,COALESCE(v.state,'expected') visit_state,(SELECT GROUP_CONCAT(t.code, ', ') FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id WHERE rt.reservation_id=r.id) table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE r.book_date=? ORDER BY r.service,r.time,r.id`).bind(selected)]);
+ const cfg=JSON.parse(settings.results?.[0]?.value||'{}');
+ return json({start,end,selected,details:details.results||[],reservations:reservations.results||[],events:events.results||[],blocks:blocks.results||[],weekdays:cfg.weekdays||[],serviceEnabled:{lunch:!!cfg.lunch?.enabled,dinner:!!cfg.dinner?.enabled},closedDates:(cfg.closedDates||[]).filter(d=>d>=start&&d<=end)});
+}
 if(resource==='analytics'&&method==='GET'){
  const q=new URL(ctx.request.url).searchParams;
  const start=q.get('start')||today(),end=q.get('end')||today();
