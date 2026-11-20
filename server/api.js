@@ -513,7 +513,32 @@ if(resource==='tables'){
  }
  if(method==='DELETE'){const id=Number(parts[2]);const count=await db.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE table_id=?').bind(id).first();if(count.n)return fail('Questo tavolo ha prenotazioni storiche: disattivalo invece di eliminarlo');await db.batch([db.prepare('DELETE FROM table_links WHERE table_a=? OR table_b=?').bind(id,id),db.prepare('DELETE FROM table_details WHERE table_id=?').bind(id),db.prepare('DELETE FROM tables WHERE id=?').bind(id)]);return json({ok:true})}
 }
-if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,GROUP_CONCAT(t.code, ', ') table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);if(b.action==='edit_details'){
+if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,GROUP_CONCAT(t.code, ', ') table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);if(b.action==='edit_full'){
+ const fields=['book_date','service','time','party_size','name','phone','email','notes','room_id','status'];
+ const snapshot=b.expected;
+ const originalIds=(await db.prepare('SELECT table_id FROM reservation_tables WHERE reservation_id=? ORDER BY table_id').bind(id).all()).results.map(t=>Number(t.table_id));
+ if(old.status!=='confirmed'||!snapshot||fields.some(k=>String(snapshot[k]??'')!==String(old[k]??''))||JSON.stringify(snapshot.table_ids)!==JSON.stringify(originalIds))return fail('Prenotazione modificata o annullata nel frattempo. Chiudi il pannello e riapri la scheda aggiornata.',409);
+ let v;try{v=await validateBooking(db,b,true)}catch(e){return fail(e.message)}
+ const {d,tm,svc,party,ids}=v,name=clean(b.name,120),phone=clean(b.phone,40),email=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600);
+ if(!name||!phone||!validEmail(email))return fail('Nome, telefono ed email valida sono obbligatori');
+ const moving=d!==old.book_date||svc!==old.service;
+ const visit=await db.prepare('SELECT state FROM service_visits WHERE reservation_id=?').bind(id).first();
+ if(moving&&visit&&visit.state!=='expected')return fail('Ripristina lo stato Atteso prima di cambiare data o servizio.',409);
+ const candidate=await manualTableCandidate(db,ids,d,svc,party,b.table_ids,id);
+ if(!candidate)return fail(Array.isArray(b.table_ids)&&b.table_ids.length?await manualTableUnavailableReason(db,ids,d,svc,party,b.table_ids,id):'Seleziona almeno un tavolo disponibile.',409);
+ try{
+  await db.batch([
+   db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM reservations WHERE id=? AND ${fields.map(k=>k+' IS ?').join(' AND ')}) AND COALESCE((SELECT group_concat(table_id,',') FROM (SELECT table_id FROM reservation_tables WHERE reservation_id=? ORDER BY table_id)),'')=? AND (?=0 OR COALESCE((SELECT state FROM service_visits WHERE reservation_id=?),'expected')='expected') THEN 1 ELSE json('oasi_stale_edit') END guard`).bind(id,...fields.map(k=>old[k]),id,originalIds.join(','),moving?1:0,id),
+   db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),
+   db.prepare('UPDATE reservations SET book_date=?,service=?,time=?,name=?,phone=?,email=?,notes=?,room_id=? WHERE id=?').bind(d,svc,tm,name,phone,email,notes,candidate.room_id,id),
+   ...candidate.ids.map(t=>db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) VALUES(?,?,?,?)').bind(id,t,d,svc)),
+   db.prepare('UPDATE reservations SET party_size=? WHERE id=?').bind(party,id)
+  ]);
+ }catch(e){return fail('Modifica non salvata: disponibilità o prenotazione variata nel frattempo. La prenotazione precedente è rimasta invariata.',409)}
+ const changed={...old,book_date:d,service:svc,time:tm,party_size:party,name,phone,email,notes,room_id:candidate.room_id};let status='unconfigured';
+ try{await syncCustomer(db,changed);await alertStaff(db,id,'edit','Prenotazione modificata #'+id,`${d} · ${name}`);if(moving||old.email!==email||old.time!==tm||Number(old.party_size)!==party)status=(await emailForBooking(ctx,changed,'change','',`change:${id}:${Date.now()}`)).status}catch(e){console.error('Oasi full edit communications',e)}
+ return json({ok:true,id,email_status:status});
+} if(b.action==='edit_details'){
  if(old.status!=='confirmed')return fail('Prenotazione annullata: impossibile modificare',409);
  const name=clean(b.name,120),phone=clean(b.phone,40),email=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600),time=clean(b.time,5),party=Number(b.party_size);
  if(!name||!phone||!validEmail(email)||!timeOk(time)||!Number.isInteger(party)||party<1||party>200)return fail('Inserisci nome, telefono ed email valida, oltre ai dati della prenotazione',400);
