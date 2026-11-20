@@ -1422,3 +1422,56 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .oasi-booking-drawer-layer .oasi-booking-drawer{height:100dvh!important;max-height:100dvh!important;width:100%!important;max-width:100%!important;display:flex!important;flex-direction:column;overflow:hidden!important}.oasi-booking-drawer-layer .oasi-booking-drawer-header{padding:13px 14px!important;flex:none}.oasi-booking-drawer-layer .oasi-booking-drawer-header h2{font-size:clamp(27px,7vw,34px)!important;line-height:1.12!important}.oasi-booking-drawer-layer .oasi-booking-drawer-form{display:flex!important;flex-direction:column;min-height:0;flex:1;overflow:hidden}.oasi-booking-drawer-layer .oasi-booking-drawer-fields{flex:1;min-height:0;overflow-y:auto!important;padding:14px!important;gap:12px!important;overscroll-behavior:contain}.oasi-booking-drawer-layer .oasi-booking-drawer-pair{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important}.oasi-booking-drawer-layer .oasi-booking-drawer-actions{flex:none;display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.8fr);padding:10px 12px max(10px,env(safe-area-inset-bottom,0px))!important}.oasi-booking-drawer-layer .oasi-booking-drawer-actions button{width:100%!important;min-width:0!important;min-height:48px!important;white-space:normal!important}
  .oasi-media-card,.oasi-media-upload{min-width:0;max-width:100%;overflow:hidden}.oasi-media-grid{grid-template-columns:minmax(0,1fr)!important}
 }
+
+/* Public editorial photography — refined shapes, quiet depth and native-free icons. */
+.oasi-public .oasi-arrow{width:16px;height:16px;display:inline-block;vertical-align:middle;flex-shrink:0;color:inherit}
+.oasi-public .oasi-hero-buttons .btn,.oasi-public .oasi-mobile-book a{justify-content:center;text-align:center}
+.oasi-public .oasi-story-visual,.oasi-public .dedicated-story-visual{padding:8px;border:1px solid #c6ae8c;border-radius:24px 90px 24px 24px;box-sizing:border-box;background:#f8f5ed;box-shadow:0 20px 48px #30251b13;min-width:0}
+.oasi-public .oasi-story-visual>img,.oasi-public .oasi-story-visual>.oasi-editorial-placeholder,.oasi-public .dedicated-story-visual>img,.oasi-public .dedicated-story-visual>.oasi-editorial-placeholder{display:block;width:100%;border-radius:17px 82px 17px 17px;box-shadow:none;object-fit:cover}
+.oasi-public .oasi-photo-index,.oasi-public .dedicated-stamp{bottom:22px;left:22px;border-radius:8px;padding:12px 15px;background:#f8f5ed;color:#564635;font-size:10px;box-shadow:0 5px 20px #19150f20;max-width:calc(100% - 44px);box-sizing:border-box}
+.oasi-public :is(.oasi-food-editorial,.oasi-event-editorial,.oasi-menu-editorial)>:is(img,.oasi-editorial-placeholder){border-radius:22px 78px 22px 22px;border:1px solid #c6ae8c;box-sizing:border-box;box-shadow:0 20px 48px #19150f20;object-fit:cover;min-width:0}
+.oasi-public .oasi-food-editorial>:is(img,.oasi-editorial-placeholder){border-radius:78px 22px 22px 22px;border-color:#d8bd9580}
+.oasi-public .oasi-editorial-photo-grid{grid-template-columns:1.22fr .88fr .88fr;gap:clamp(12px,2vw,26px);align-items:start}
+.oasi-public .oasi-editorial-photo-grid>a{display:block;position:relative;min-width:0;padding:5px;border:1px solid #c6ae8c;border-radius:22px 52px 22px 22px;background:#f8f5ed;overflow:hidden;box-shadow:0 15px 30px #30251b15;box-sizing:border-box}
+.oasi-public .oasi-editorial-photo-grid>a:nth-child(2){margin-top:42px;border-radius:52px 22px 22px 22px}
+.oasi-public .oasi-editorial-photo-grid>a:nth-child(3){margin-top:18px}
+.oasi-public .oasi-editorial-photo-grid>a img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;border-radius:17px 46px 17px 17px;transition:filter .3s ease}
+.oasi-public .oasi-editorial-photo-grid>a:nth-child(2) img{border-radius:46px 17px 17px 17px}
+.oasi-public .oasi-editorial-photo-grid>a:first-child img{aspect-ratio:4/5}
+.oasi-public .dedicated-gallery-grid{gap:clamp(12px,2vw,26px);align-items:start}
+.oasi-public .dedicated-gallery-item{border-radius:22px 60px 22px 22px;box-shadow:0 14px 35px #30251b1a;border:1px solid #c6ae8c;box-sizing:border-box;aspect-ratio:4/5;background:#e9e3dc}
+.oasi-public .dedicated-gallery-item:nth-child(3n+2){border-radius:60px 22px 22px 22px;aspect-ratio:3/4}
+.oasi-public .dedicated-gallery-item img,.oasi-public .dedicated-gallery-item:nth-child(3n+2) img{width:100%;height:100%;aspect-ratio:auto;display:block;object-fit:cover}
+.oasi-public .dedicated-gallery-item:after{inset:48% 0 0;background:linear-gradient(transparent,#171810c9)}
+.oasi-public .dedicated-gallery-item>span:not(.gallery-zoom){left:15px;right:48px;bottom:17px;line-height:1.3;overflow-wrap:anywhere;font-size:14px}
+.oasi-public .dedicated-gallery-item .gallery-zoom{display:grid;place-items:center;right:12px;bottom:13px;left:auto;width:34px;height:34px;border:1px solid #fffc;border-radius:50%;background:#252b2440}
+.oasi-public .event-story-media>:is(img,.oasi-editorial-placeholder){border:1px solid #c6ae8c;border-radius:24px 72px 24px 24px;box-shadow:0 18px 42px #30251b1c;box-sizing:border-box}
+.oasi-public .event-offer-card{border:1px solid #d8c9b4;border-radius:28px;background:#fcfaf6;padding:8px;box-shadow:0 16px 40px #30251b10;min-width:0;box-sizing:border-box}
+.oasi-public .event-offer-card>:is(img,.oasi-editorial-placeholder){border-radius:20px 48px 20px 20px;width:100%;height:auto;aspect-ratio:5/4;object-fit:cover;min-height:0}
+.oasi-public .event-offer-card>div:not(.oasi-editorial-placeholder){padding:22px 17px 24px}
+.oasi-public .event-offer-card h3{font-size:clamp(28px,3vw,38px)}
+.oasi-public .oasi-event-photos img{border-radius:20px 55px 20px 20px;border:1px solid #c6ae8c;box-shadow:0 13px 30px #30251b13;box-sizing:border-box}
+.oasi-public .booking-side>:is(img,.oasi-editorial-placeholder){border-radius:20px 56px 20px 20px;border:1px solid #c6ae8c;box-sizing:border-box;box-shadow:0 12px 30px #30251b15}
+@media(hover:hover){.oasi-public .oasi-editorial-photo-grid>a:hover img{filter:brightness(1.07)}}
+@media(max-width:680px){
+ .oasi-public .oasi-story-visual,.oasi-public .dedicated-story-visual{padding:5px;border-radius:19px 58px 19px 19px}
+ .oasi-public .oasi-story-visual>img,.oasi-public .oasi-story-visual>.oasi-editorial-placeholder,.oasi-public .dedicated-story-visual>img,.oasi-public .dedicated-story-visual>.oasi-editorial-placeholder{border-radius:14px 52px 14px 14px;aspect-ratio:5/4;height:auto;min-height:0}
+ .oasi-public .oasi-photo-index,.oasi-public .dedicated-stamp{left:14px;bottom:14px;padding:9px 11px}
+ .oasi-public :is(.oasi-food-editorial,.oasi-event-editorial,.oasi-menu-editorial)>:is(img,.oasi-editorial-placeholder){border-radius:18px 54px 18px 18px;aspect-ratio:5/4}
+ .oasi-public .oasi-editorial-photo-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+ .oasi-public .oasi-editorial-photo-grid>a{padding:4px;border-radius:16px 35px 16px 16px}
+ .oasi-public .oasi-editorial-photo-grid>a:first-child{grid-column:1/-1}
+ .oasi-public .oasi-editorial-photo-grid>a:first-child img{aspect-ratio:5/3}
+ .oasi-public .oasi-editorial-photo-grid>a:nth-child(2),.oasi-public .oasi-editorial-photo-grid>a:nth-child(3){margin-top:0}
+ .oasi-public .oasi-editorial-photo-grid>a img{border-radius:12px 30px 12px 12px}
+ .oasi-public .oasi-editorial-photo-grid>a:nth-child(2){border-radius:35px 16px 16px 16px}
+ .oasi-public .oasi-editorial-photo-grid>a:nth-child(2) img{border-radius:30px 12px 12px 12px}
+ .oasi-public .dedicated-gallery-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+ .oasi-public .dedicated-gallery-item,.oasi-public .dedicated-gallery-item:nth-child(3n+2){border-radius:16px 38px 16px 16px;aspect-ratio:4/5}
+ .oasi-public .dedicated-gallery-item>span:not(.gallery-zoom){font-size:12px;left:10px;right:34px;bottom:12px}
+ .oasi-public .dedicated-gallery-item .gallery-zoom{right:7px;bottom:8px;width:24px;height:24px}
+ .oasi-public .dedicated-gallery-item .gallery-zoom svg{width:12px;height:12px}
+ .oasi-public .event-story-media>:is(img,.oasi-editorial-placeholder){border-radius:18px 54px 18px 18px;min-height:0;aspect-ratio:5/4}
+ .oasi-public .event-offer-card{border-radius:22px;padding:6px}
+ .oasi-public .event-offer-card>:is(img,.oasi-editorial-placeholder){border-radius:16px 36px 16px 16px}
+}
