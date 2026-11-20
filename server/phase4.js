@@ -81,14 +81,14 @@ export async function eventsAdmin(ctx,parts,method,body){
   }else{
    actions.push(db.prepare(`INSERT INTO oasi_private_events(id,title,kind,contact_name,phone,email,start_date,end_date,service,status,guests,estimated_cents,deposit_cents,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(eventId,e.title,e.kind,e.contact,e.phone,e.email,e.start,e.end,e.service,e.status,e.guests,e.estimate,e.deposit,e.notes,timestamp,timestamp));
   }
-  for(const room_id of e.rooms)actions.push(db.prepare('INSERT INTO oasi_event_rooms(event_id,room_id) VALUES(?,?)').bind(eventId,room_id));
-  for(const slot of slots)actions.push(db.prepare('INSERT INTO oasi_event_room_slots(event_id,room_id,book_date,service) VALUES(?,?,?,?)').bind(eventId,slot.room_id,slot.date,slot.service));
+  actions.push(db.prepare('INSERT INTO oasi_event_rooms(event_id,room_id) SELECT ?,value FROM json_each(?)').bind(eventId,JSON.stringify(e.rooms)));
+  if(slots.length)actions.push(db.prepare(`INSERT INTO oasi_event_room_slots(event_id,room_id,book_date,service) SELECT ?,json_extract(value,'$.room_id'),json_extract(value,'$.date'),json_extract(value,'$.service') FROM json_each(?)`).bind(eventId,JSON.stringify(slots))); 
   await db.batch(actions);
   return respond({ok:true,id:eventId,blocked_slots:slots.length},old?200:201);
  }catch(err){
   const m=String(err?.message||err);
-  if(/UNIQUE|SQLITE_CONSTRAINT|oasi_event_slot_conflict/i.test(m))return fail('La sala è stata occupata da un altro evento durante il salvataggio. Aggiorna l’agenda e riprova.',409);
   if(/oasi_event_existing_reservations/.test(m))return fail('La sala ha già una prenotazione confermata. Non è possibile salvarla come riservata per l’evento.',409);
+  if(/UNIQUE|oasi_event_slot_conflict/i.test(m))return fail('La sala è stata occupata da un altro evento durante il salvataggio. Aggiorna l’agenda e riprova.',409);
   return fail(m,400);
  }
 }

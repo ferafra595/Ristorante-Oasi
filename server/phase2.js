@@ -3,19 +3,10 @@ const timestamp=()=>new Date().toISOString();
 const clean=(s,n=250)=>String(s??'').trim().slice(0,n);
 const htmlEscape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const validEmail=s=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s||''))&&String(s).length<=180;
-export async function ensurePhase2(db){
- await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_customers(id INTEGER PRIMARY KEY AUTOINCREMENT,email TEXT NOT NULL COLLATE NOCASE UNIQUE,name TEXT NOT NULL,phone TEXT NOT NULL,staff_note TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`).run();
- await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_customers_phone ON oasi_customers(phone)`).run();
- await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_customer_reservations(reservation_id INTEGER PRIMARY KEY REFERENCES reservations(id) ON DELETE CASCADE, customer_id INTEGER NOT NULL REFERENCES oasi_customers(id) ON DELETE CASCADE)`).run();
- await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_customer_res_customer ON oasi_customer_reservations(customer_id)`).run();
- await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_email_log(id INTEGER PRIMARY KEY AUTOINCREMENT,event_key TEXT NOT NULL UNIQUE,reservation_id INTEGER REFERENCES reservations(id) ON DELETE SET NULL,recipient TEXT NOT NULL,email_type TEXT NOT NULL,subject TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','sent','failed','unconfigured')) DEFAULT 'pending',error TEXT NOT NULL DEFAULT '',provider_id TEXT NOT NULL DEFAULT '',attempted_at TEXT,created_at TEXT NOT NULL)`).run();
- await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_email_log_reservation ON oasi_email_log(reservation_id,created_at)`).run();
- await db.prepare(`CREATE TABLE IF NOT EXISTS oasi_staff_notifications(id INTEGER PRIMARY KEY AUTOINCREMENT,reservation_id INTEGER REFERENCES reservations(id) ON DELETE SET NULL,event_type TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,seen INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL)`).run();
- await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oasi_staff_notifications_recent ON oasi_staff_notifications(seen,created_at DESC)`).run();
-}
+// Schema gestito dalle migrazioni D1 obbligatorie 0006–0007. Nessuna DDL nel servizio.
 export async function syncCustomer(db,booking){
  const mail=clean(booking.email,180).toLowerCase();if(!validEmail(mail))return;
- await ensurePhase2(db);
+ 
  const linked=booking.id?await db.prepare(`SELECT c.* FROM oasi_customer_reservations cr JOIN oasi_customers c ON c.id=cr.customer_id WHERE cr.reservation_id=?`).bind(booking.id).first():null;
  let customer=linked||await db.prepare(`SELECT * FROM oasi_customers WHERE email=?`).bind(mail).first();
  const name=clean(booking.name,120),phone=clean(booking.phone,40),when=timestamp();
@@ -33,7 +24,7 @@ export async function syncCustomer(db,booking){
  if(booking.id&&customer){await db.prepare(`INSERT INTO oasi_customer_reservations(reservation_id,customer_id) VALUES(?,?) ON CONFLICT(reservation_id) DO UPDATE SET customer_id=excluded.customer_id`).bind(Number(booking.id),Number(customer.id)).run()}
 }
 export async function alertStaff(db,reservationId,eventType,title,message){
- await ensurePhase2(db);
+ 
  await db.prepare('INSERT INTO oasi_staff_notifications(reservation_id,event_type,title,message,created_at) VALUES(?,?,?,?,?)').bind(reservationId||null,clean(eventType,40),clean(title,160),clean(message,600),timestamp()).run();
 }
 const emailLayout=(title,body)=>`<!doctype html><html lang="it"><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;background:#f6f3ef;padding:32px;color:#292622"><div style="max-width:620px;margin:auto;background:#fff;padding:36px;border-radius:24px"><p style="letter-spacing:.20em;color:#ac8e68;font-size:11px">RISTORANTE OASI · DAL 1997</p><h1 style="font-family:Georgia,serif;font-size:31px;font-weight:400">${htmlEscape(title)}</h1>${body}<hr style="border:0;border-top:1px solid #e8dfd3;margin:28px 0"><p style="font-size:12px;color:#847b70">Contrada Serrarossa · Roccabernarda (KR) · 338 703 6868</p></div></body></html>`;
@@ -45,7 +36,7 @@ export const mailContent=(event,booking,cancelUrl='')=>{
  return {subject:`${change?'Prenotazione aggiornata':'Prenotazione confermata'} · Ristorante Oasi`,html:emailLayout(change?'Prenotazione aggiornata':'Prenotazione confermata',`<p>Ciao ${name}, la tua prenotazione è ${change?'stata aggiornata':'confermata'}.</p><p><strong>${date}</strong> · ${service} alle <strong>${time}</strong> · <strong>${party}</strong> ${party===1?'persona':'persone'}.</p>${cancelUrl?`<p><a href="${htmlEscape(cancelUrl)}" style="color:#916d46">Annulla la prenotazione</a></p>`:''}<p>A presto, il team dell’Oasi.</p>`)};
 };
 export async function sendEmailRecorded(ctx,{eventKey,reservationId=null,to,type,subject,html}){
- const db=ctx.env.DB;await ensurePhase2(db);
+ const db=ctx.env.DB;
  const recipient=clean(to,180).toLowerCase();if(!validEmail(recipient))return {status:'failed',error:'Indirizzo email non valido'};
  const key=clean(eventKey,190);
  await db.prepare(`INSERT OR IGNORE INTO oasi_email_log(event_key,reservation_id,recipient,email_type,subject,status,created_at) VALUES(?,?,?,?,?,'pending',?)`).bind(key,reservationId,recipient,clean(type,30),clean(subject,200),timestamp()).run();
@@ -71,7 +62,7 @@ export async function emailStaff(ctx,booking,event){
 }
 // Ogni esecuzione controlla il prossimo giorno locale. Invia un solo promemoria per prenotazione.
 export async function sendDueReminders(env){
- if(!env.DB)return;const db=env.DB;await ensurePhase2(db);
+ if(!env.DB)return;const db=env.DB;
  const local=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
  const hour=Number(local.slice(11,13));if(hour<17||hour>17)return; // 17:00–17:59 italiane
  const today=local.slice(0,10),tomorrow=new Date(today+'T12:00:00Z');tomorrow.setUTCDate(tomorrow.getUTCDate()+1);const d=tomorrow.toISOString().slice(0,10);
