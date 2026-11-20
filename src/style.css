@@ -1350,3 +1350,25 @@ body.oasi-booking-drawer-open{overflow:hidden}
   .admin .admin-main .event-filter,
   .admin .admin-main .op-toolbar {padding:12px!important;}
 }
+
+/* Fase 8 — calendario amministrativo, isolato dal sito pubblico. */
+.admin .oasi-calendar,.admin .cal-detail{min-width:0;max-width:100%;box-sizing:border-box}
+.admin .cal-toolbar,.admin .cal-detail-head,.admin .cal-events-head,.admin .cal-period,.admin .cal-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.admin .cal-toolbar,.admin .cal-detail-head,.admin .cal-events-head{justify-content:space-between}
+.admin .cal-period h2,.admin .cal-detail h2{font-size:clamp(19px,2vw,28px);margin:0;text-transform:capitalize;line-height:1.2}
+.admin .cal-period button{min-width:40px;min-height:40px}
+.admin .cal-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0;width:min(100%,520px)}
+.admin .cal-filters label{display:grid;gap:4px;min-width:0;font-size:12px;color:#74644f}
+.admin .cal-filters input,.admin .cal-filters select{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font-size:16px;min-height:44px;margin:0}
+.admin .cal-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
+.admin .cal-summary>div{background:#f6f2eb;border:1px solid #e7ded0;border-radius:10px;padding:12px;min-width:0}
+.admin .cal-summary small,.admin .cal-summary strong{display:block;overflow-wrap:anywhere}.admin .cal-summary strong{font-size:26px;color:#44372b}
+.admin .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;min-width:0}
+.admin .cal-weekday{text-align:center;font-size:12px;color:#766b5c;padding:6px 0}
+.admin .cal-grid .cal-day{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:4px;min-width:0;width:100%;box-sizing:border-box;min-height:108px;background:#fff;border:1px solid #e2dbd0;border-radius:8px;padding:7px;color:#332b24;cursor:pointer;font:inherit;white-space:normal;box-shadow:none}
+.admin .cal-grid .cal-selected{border:2px solid #9b7851;background:#fcf9f3;padding:6px}.admin .cal-today .cal-number{color:#956c38;text-decoration:underline;text-underline-offset:3px}.admin .cal-outside:not(.cal-selected){background:#f4f2ee;color:#777}
+.admin .cal-number{font-weight:700;font-size:14px}.admin .cal-chip,.admin .cal-block,.admin .cal-event,.admin .cal-closed{display:block;font-size:11px;line-height:1.3;border-radius:4px;padding:3px 4px;overflow-wrap:anywhere}
+.admin .cal-lunch{background:#e7eee3;color:#39543b}.admin .cal-dinner{background:#eee5d7;color:#70532c}.admin .cal-event,.admin .cal-block{background:#f0e6f2;color:#69476d}.admin .cal-block{background:#f7e2dc;color:#8a3d2a}.admin .cal-closed{background:#eeede9;color:#5c5650}.admin .cal-legend{font-size:12px;color:#6c6257;margin:12px 0 0}
+.admin .cal-detail{margin-top:16px}.admin .cal-services{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:18px 0}.admin .cal-service-card{border:1px solid #e7ded0;border-radius:12px;padding:14px;min-width:0}.admin .cal-service-card h3{margin:0 0 10px}.admin .cal-service-numbers{display:grid;gap:5px}.admin .cal-service-numbers strong{font-size:22px}.admin .cal-service-numbers span,.admin .cal-event-detail small{font-size:13px;color:#74644f}.admin .cal-block-list,.admin .cal-warning{background:#faf0ea;border-radius:8px;padding:8px;color:#793d2b;font-size:13px;overflow-wrap:anywhere}.admin .cal-block-list p{margin:4px}.admin .cal-actions{margin-top:12px}.admin .cal-event-detail{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #e7ded0;padding:12px 0;overflow-wrap:anywhere}.admin .cal-event-detail>div{min-width:0}.admin .cal-event-detail p{margin:4px 0}.admin .cal-detail button{min-height:42px}
+@media(max-width:900px){.admin .cal-wide{display:none}.admin .cal-grid .cal-day{padding:4px;min-height:90px}.admin .cal-grid .cal-selected{padding:3px}.admin .cal-grid{gap:3px}.admin .cal-chip,.admin .cal-event,.admin .cal-block,.admin .cal-closed{font-size:10px;padding:2px}.admin .cal-filters{width:100%}}
+@media(max-width:520px){.admin .oasi-calendar,.admin .cal-detail{padding:10px!important}.admin .cal-filters{grid-template-columns:minmax(0,1fr)}.admin .cal-summary{gap:5px}.admin .cal-summary>div{padding:6px}.admin .cal-summary small{font-size:10px}.admin .cal-summary strong{font-size:21px}.admin .cal-grid .cal-day{min-height:85px;border-radius:5px;padding:3px;gap:3px}.admin .cal-grid .cal-selected{padding:2px}.admin .cal-number{font-size:12px}.admin .cal-chip,.admin .cal-event,.admin .cal-block,.admin .cal-closed{font-size:9px;padding:2px 1px}.admin .cal-weekday{font-size:10px}.admin .cal-detail-head>.btn{width:100%}.admin .cal-period{gap:5px}.admin .cal-period h2{flex:1;min-width:0;font-size:18px}.admin .cal-period button{min-width:34px;padding:5px}.admin .cal-filters input[type=date]{display:block;width:100%;min-width:0;max-width:100%;-webkit-appearance:none}.admin .cal-filters input[type=date]::-webkit-date-and-time-value{text-align:left}}
