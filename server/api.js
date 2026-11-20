@@ -237,7 +237,7 @@ return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_i
 async function phase7Ready(db){
  try{return !!(await db.prepare('SELECT version FROM oasi_schema_versions WHERE version=11').first())}catch{return false}
 }
-async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||parts[1]==='upload')?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
+async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET'||['upload','menu-pdf'].includes(parts[1]))?{}:await read(ctx.request),resource=parts[1]||'';if(resource==='login'&&method==='POST'){
  // Accesso unico: l'utente inserisce solo la password impostata come Secret su Cloudflare.
  const configuredPass=ctx.env.ADMIN_PASSWORD;
  if(typeof configuredPass!=='string'||configuredPass.length===0)return fail('Configurazione ADMIN incompleta: aggiungi ADMIN_PASSWORD come Secret di produzione su Cloudflare',503);
@@ -270,6 +270,20 @@ async function adminRoute(ctx,parts,method){const db=ctx.env.DB,b=(method==='GET
 const user=await currentUser(db,ctx.request);
 if(!user||user.email!=='oasi-admin@internal.invalid')return fail('Accesso richiesto',401);
 if(!['GET','HEAD','OPTIONS'].includes(method)&&['reservations','events','tables','floor-template','blocks','visits','rooms'].includes(resource)&&!(await phase7Ready(db)))return fail('Aggiornamento D1 incompleto: applica la migrazione 0011 prima di modificare i dati.',503);
+if(resource==='menu-pdf'){
+ if(!ctx.env.MEDIA)return fail('Bucket R2 non configurato',503);
+ if(method==='GET'){const obj=await ctx.env.MEDIA.head('restaurant-menu.pdf');return json({available:!!obj,size:obj?.size||0,updated:obj?.uploaded?.toISOString()||null});}
+ if(method==='POST'){
+  const limit=15*1024*1024;
+  if(Number(ctx.request.headers.get('content-length')||0)>limit+65536)return fail('Il PDF deve essere inferiore a 15 MB',413);
+  let form;try{form=await ctx.request.formData()}catch{return fail('Caricamento non valido',400)}
+  const file=form.get('file');if(!file||typeof file==='string'||file.size<8||file.size>limit||!file.name.toLowerCase().endsWith('.pdf'))return fail('Seleziona un PDF valido fino a 15 MB',400);
+  const bytes=await file.arrayBuffer();if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')return fail('Il file non è un PDF valido',400);
+  await ctx.env.MEDIA.put('restaurant-menu.pdf',bytes,{httpMetadata:{contentType:'application/pdf'}});
+  return json({ok:true});
+ }
+ return fail('Metodo non consentito',405);
+}
 if(resource==='security')return securityRoute(ctx,parts,method,b,user);
 if(resource==='events')return eventsAdmin(ctx,parts,method,b);
 if(resource==='me')return json({user});
@@ -580,7 +594,11 @@ if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url
 if(['menu','gallery'].includes(resource)){const table=resource==='menu'?'menu_items':'gallery';if(method==='GET')return json((await db.prepare(`SELECT * FROM ${table} ORDER BY sort_order,id`).all()).results);if(method==='POST'||method==='PUT'){const fields=table==='menu_items'?['section','category','name','description','price','allergens','image_url','region','winery','vintage','available','sort_order']:['image_url','caption','category','sort_order'];const values=fields.map(k=>['available','sort_order'].includes(k)?Number(b[k]??(k==='available'?1:0)):clean(b[k],k==='description'?1400:600));if(method==='POST'){const r=await db.prepare(`INSERT INTO ${table}(${fields.join(',')}) VALUES(${fields.map(()=>'?').join(',')})`).bind(...values).run();return json({ok:true,id:r.meta.last_row_id})}await db.prepare(`UPDATE ${table} SET ${fields.map(f=>f+'=?').join(',')} WHERE id=?`).bind(...values,Number(parts[2])).run();return json({ok:true})}if(method==='DELETE'){await db.prepare(`DELETE FROM ${table} WHERE id=?`).bind(Number(parts[2])).run();return json({ok:true})}}
 if(resource==='upload'&&method==='POST'){if(!ctx.env.MEDIA)return fail('Bucket R2 non configurato',503);const form=await ctx.request.formData(),file=form.get('file');if(!file||typeof file==='string'||!file.type.startsWith('image/')||file.size>7*1024*1024)return fail('Carica un’immagine valida fino a 7MB');const ext=({ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'})[file.type];if(!ext)return fail('Formato non supportato');const key=rand()+'.'+ext;await ctx.env.MEDIA.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type}});return json({url:'/api/media/'+key})}
 return fail('Rotta non trovata',404)}
-export async function onRequest(ctx){try{const url=new URL(ctx.request.url),parts=url.pathname.replace(/^\/api\/?/,'').split('/').filter(Boolean),method=ctx.request.method,db=ctx.env.DB;if(parts[0]==='admin'&&parts[1]==='status'&&method==='GET')return json({ok:true,api:true,database:!!ctx.env.DB,password_configured:typeof ctx.env.ADMIN_PASSWORD==='string'&&ctx.env.ADMIN_PASSWORD.length>0});if(!ctx.env.DB)return fail('Database D1 non configurato',503);if(parts[0]==='media'&&method==='GET'){if(!ctx.env.MEDIA)return fail('Bucket non configurato',503);const obj=await ctx.env.MEDIA.get(parts[1]);if(!obj)return fail('Immagine non trovata',404);return new Response(obj.body,{headers:{'content-type':obj.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=86400'}})}
+export async function onRequest(ctx){try{const url=new URL(ctx.request.url),parts=url.pathname.replace(/^\/api\/?/,'').split('/').filter(Boolean),method=ctx.request.method,db=ctx.env.DB;if(parts[0]==='admin'&&parts[1]==='status'&&method==='GET')return json({ok:true,api:true,database:!!ctx.env.DB,password_configured:typeof ctx.env.ADMIN_PASSWORD==='string'&&ctx.env.ADMIN_PASSWORD.length>0});if(!ctx.env.DB)return fail('Database D1 non configurato',503);if(parts[0]==='menu-pdf'&&method==='GET'){
+ const obj=await ctx.env.MEDIA?.get('restaurant-menu.pdf');if(!obj)return fail('Menù non ancora disponibile',404);
+ return new Response(obj.body,{headers:{'content-type':'application/pdf','content-disposition':(url.searchParams.has('download')?'attachment':'inline')+'; filename="Menu-Ristorante-Oasi.pdf"','cache-control':'no-store','x-content-type-options':'nosniff','content-security-policy':"sandbox; default-src 'none'"}});
+}
+if(parts[0]==='media'&&method==='GET'){if(!ctx.env.MEDIA)return fail('Bucket non configurato',503);if(parts[1]==='restaurant-menu.pdf')return fail('Risorsa non trovata',404);const obj=await ctx.env.MEDIA.get(parts[1]);if(!obj)return fail('Immagine non trovata',404);return new Response(obj.body,{headers:{'content-type':obj.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=86400'}})}
 if(parts[0]==='setup')return fail('Configurazione iniziale disabilitata: usa ADMIN_PASSWORD',404);
 if(parts[0]==='admin'){
  // Le mutazioni ADMIN richiedono richieste provenienti dallo stesso sito.
@@ -596,7 +614,7 @@ if(parts[0]==='admin'){
  }
  return response;
 }
-if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=await Promise.all([config(db,'site'),config(db,'booking'),db.prepare('SELECT id,name,public_enabled FROM rooms ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM menu_items WHERE available=1 ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM gallery ORDER BY sort_order,id').all()]);return json({site,booking,rooms:rooms.results,menu:menu.results,gallery:gallery.results,email_enabled:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)})}
+if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=await Promise.all([config(db,'site'),config(db,'booking'),db.prepare('SELECT id,name,public_enabled FROM rooms ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM menu_items WHERE available=1 ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM gallery ORDER BY sort_order,id').all()]);const menuPdf=!!(await ctx.env.MEDIA?.head('restaurant-menu.pdf').catch(()=>null));return json({site,booking,rooms:rooms.results,menu:menu.results,gallery:gallery.results,menuPdf,email_enabled:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)})}
 if(parts[0]==='availability'&&method==='GET'){const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await candidates(db,state.ids,state.d,state.svc,state.party);return json({available:options.length>0,message:options.length?'':await bookingUnavailableReason(db,state.ids,state.d,state.svc,state.party,false),rooms:(await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1').all()).results.filter(r=>options.some(o=>o.room_id===r.id))})}
 if(parts[0]==='book'&&method==='POST'){if(!(await phase7Ready(db)))return fail('Prenotazioni temporaneamente sospese per aggiornamento. Contatta il ristorante.',503);try{return json(await saveBooking(ctx,await read(ctx.request),false),201)}catch(e){return fail(e.message||'Impossibile registrare la prenotazione',409)}}
 if(parts[0]==='cancel'&&method==='POST'){const b=await read(ctx.request);if(!/^[a-f0-9]{64}$/.test(b.token||''))return fail('Link non valido');const hashed=await digest(b.token),r=await db.prepare('SELECT id,status FROM reservations WHERE cancel_token_hash=?').bind(hashed).first();if(!r)return fail('Prenotazione non trovata',404);if(r.status==='cancelled')return json({ok:true,already:true});const cancelled=await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=? AND status='confirmed'").bind(r.id),db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(r.id)]);if(!cancelled[0].meta.changes)return json({ok:true,already:true});
