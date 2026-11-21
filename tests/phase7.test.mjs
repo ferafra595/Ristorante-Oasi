@@ -138,3 +138,41 @@ test('service arrival progression never releases or duplicates booked tables',as
  ok(await x.call('admin/visits/'+id,'PATCH',{state:'expected'}));
  assert.deepEqual(x.assigned(id),[1]);
 });
+
+test('concorrenza: banchetto condiviso e prenotazione normale non possono occupare lo stesso tavolo',async()=>{
+ const x=await setup();
+ const [banquet,normal]=await Promise.all([
+  x.book([1,2,3],18,{banquet_shared:true}),
+  x.book([2],5)
+ ]);
+ assert.equal([banquet,normal].filter(r=>r.status===201).length,1);
+ assert.equal(x.rows().length,1);
+ const occupied=x.db.sql.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE table_id=2 AND book_date=? AND service=?').get(date,'lunch');
+ assert.equal(occupied.n,1);
+});
+test('un banchetto annullato libera esattamente i tavoli assegnati, senza toccare le altre prenotazioni',async()=>{
+ const x=await setup();
+ const banquet=await x.book([1,2,3],18,{banquet_shared:true});ok(banquet,201);
+ const ordinary=await x.book([6],2);ok(ordinary,201);
+ ok(await x.cancel(banquet.body.id));
+ assert.deepEqual(x.assigned(banquet.body.id),[]);
+ assert.deepEqual(x.assigned(ordinary.body.id),[6]);
+ ok(await x.book([1,2],12),201);
+});
+test('i blocchi di sala e tavolo si applicano anche ai banchetti condivisi',async()=>{
+ const x=await setup();
+ ok(await x.block('table',2));
+ rejected(await x.book([1,2,3],18,{banquet_shared:true}));
+ assert.equal(x.rows().length,0);
+ ok(await x.block('room',1));
+ rejected(await x.book([1,3],9,{banquet_shared:true}));
+ assert.equal(x.rows().length,0);
+});
+test('banchetto a pranzo non impedisce l\'utilizzo degli stessi tavoli a cena',async()=>{
+ const x=await setup();
+ const lunch=await x.book([1,2,3],18,{banquet_shared:true});ok(lunch,201);
+ const dinner=await x.book([1,2,3],18,{banquet_shared:true,service:'dinner',time:'19:30'});ok(dinner,201);
+ assert.equal(x.rows().length,2);
+ assert.deepEqual(x.assigned(lunch.body.id),[1,2,3]);
+ assert.deepEqual(x.assigned(dinner.body.id),[1,2,3]);
+});
