@@ -1475,3 +1475,24 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .oasi-public .event-offer-card{border-radius:22px;padding:6px}
  .oasi-public .event-offer-card>:is(img,.oasi-editorial-placeholder){border-radius:16px 36px 16px 16px}
 }
+
+
+/* Oasi: shared accessibility and small-device layout hardening */
+.oasi-skip-link{position:fixed;left:12px;top:8px;z-index:20000;transform:translateY(-180%);padding:11px 16px;background:#252b24;color:#fff;border-radius:10px;font-weight:700;box-shadow:0 6px 24px #0004}
+.oasi-skip-link:focus-visible{transform:translateY(0)}
+.oasi-public #links[hidden]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+.oasi-public :is(a,button,input,select,textarea):focus-visible,.admin :is(a,button,input,select,textarea):focus-visible{outline:3px solid #a98151;outline-offset:3px}
+.oasi-mobile-nav .oasi-nav-symbol{display:flex;align-items:center;justify-content:center;min-height:24px}
+.oasi-mobile-nav .oasi-nav-symbol svg{width:21px;height:21px;stroke:currentColor;fill:none;flex:none}
+@media(max-width:700px){
+ html,body{max-width:100%;overflow-x:clip}
+ .oasi-public main,.admin-main{min-width:0}
+ .oasi-public :is(.fields,.fields.two,.fields.three){grid-template-columns:minmax(0,1fr)!important}
+ .oasi-public :is(input,select,textarea),.admin :is(input,select,textarea){box-sizing:border-box;max-width:100%;min-width:0;font-size:16px}
+ .oasi-public input[type=date],.oasi-public input[type=time],.admin input[type=date],.admin input[type=time]{width:100%;min-inline-size:0;-webkit-appearance:none;appearance:none}
+ .oasi-public #booking{min-width:0;max-width:100%;overflow:visible}
+ .oasi-public #booking .btn{min-height:50px;white-space:normal}
+ .oasi-public .oasi-mobile-book{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+ .admin .oasi-mobile-nav button{touch-action:manipulation;min-width:0}
+}
+@media(prefers-reduced-motion:reduce){.oasi-public *, .oasi-public *::before,.oasi-public *::after,.admin *, .admin *::before,.admin *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
