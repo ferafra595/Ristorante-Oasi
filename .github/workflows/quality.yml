@@ -1,0 +1,25 @@
+name: Oasi - controlli qualità
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check src/main.js
+          node --check server/api.js
+          node --check server/index.js
+          node --check server/seo.js
+      - name: Database and API regression tests
+        run: node --test tests/*.test.mjs
+      - name: Build public website
+        run: npm run build
