@@ -1505,3 +1505,31 @@ body.oasi-booking-drawer-open{overflow:hidden}
 .admin .oasi-quick-suggestion select{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;background:#fff;border:1px solid #d7cab8;border-radius:12px;min-height:50px;padding:10px 13px;color:#332b23;font-size:16px}
 .admin .oasi-quick-suggestion #oasi-suggestion-hint{font-size:13px;line-height:1.55;color:#736957;margin:0;overflow-wrap:anywhere}
 @media(max-width:700px){.admin .oasi-quick-suggestion{padding:14px;gap:10px;border-radius:15px}.admin .oasi-quick-suggestion select{font-size:16px;min-height:52px}}
+
+
+/* Oasi - service on phone: guest cards replace wide operational table */
+.admin .oasi-service-mobile-cards{display:none}
+@media(max-width:900px){
+ .admin .op-service-list .table-scroll{display:none}
+ .admin .op-service-list{min-width:0;padding:16px!important;overflow:visible}
+ .admin .oasi-service-mobile-cards{display:grid;gap:12px;margin-top:15px;min-width:0}
+ .admin .oasi-service-guest{display:grid;gap:12px;min-width:0;background:#fffdfa;border:1px solid #e5d9c9;border-radius:18px;padding:16px;box-shadow:0 5px 24px rgba(45,33,21,.035)}
+ .admin .oasi-service-guest-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+ .admin .oasi-service-guest-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:#392c20}
+ .admin .oasi-service-guest-status{font-size:12px;font-weight:700;background:#f1e9df;border-radius:100px;padding:7px 11px;color:#70573a}
+ .admin .oasi-service-guest-status[data-visit-status="arrived"]{background:#fff0d8;color:#865b16}
+ .admin .oasi-service-guest-status[data-visit-status="seated"]{background:#e4eee7;color:#2c6749}
+ .admin .oasi-service-guest-status[data-visit-status="finished"]{background:#e9e7e4;color:#625d58}
+ .admin .oasi-service-guest-status[data-visit-status="no_show"]{background:#f6e7e5;color:#934c47}
+ .admin .oasi-service-guest h4{font-family:'DM Sans',sans-serif;font-size:17px;line-height:1.35;font-weight:700;color:#292521;overflow-wrap:anywhere;margin:0}
+ .admin .oasi-service-guest p{margin:0;color:#756b5f;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+ .admin .oasi-service-guest-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
+ .admin .oasi-service-guest-actions>*{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:48px;box-sizing:border-box;border-radius:12px;padding:11px 15px;font-size:13px;font-weight:700;line-height:1.35;text-decoration:none;touch-action:manipulation}
+ .admin .oasi-service-next{background:#292c25;color:#fff;border:1px solid #292c25;flex:1 1 165px}
+ .admin .oasi-service-edit,.admin .oasi-service-call{background:#fff;border:1px solid #ded0bd;color:#3b3026;flex:1 1 84px}
+ .admin .oasi-service-guest-actions button:disabled{opacity:.58;cursor:wait}
+ .admin .oasi-service-guest-manual{display:grid;gap:7px;border-top:1px solid #eee7dc;padding-top:11px;color:#6b6156;font-size:12px;font-weight:600}
+ .admin .oasi-service-guest-manual select{width:100%;min-width:0;max-width:100%;min-height:46px;box-sizing:border-box;border:1px solid #e3d7c8;border-radius:11px;background:white;padding:9px 12px;font-size:16px;color:#302922}
+ .admin .oasi-service-guest-empty{font-size:14px;color:#756b5f}
+}
+@media(max-width:380px){.admin .op-service-list{padding:12px!important}.admin .oasi-service-guest{padding:13px}.admin .oasi-service-guest-actions>*{flex:1 1 100%}}
