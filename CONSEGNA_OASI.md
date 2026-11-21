@@ -77,3 +77,46 @@ Registrare: data e ora, commit GitHub pubblicato, URL definitivo, esito backup/r
 - Non eseguire le migrazioni su un database diverso da quello collegato al Worker.
 - Non modificare manualmente tavoli prenotati durante il servizio senza ricollocare le prenotazioni.
 - Per ora non sono previste fatturazione, comande o pagamenti integrati: il progetto rimane un sito con gestionale di prenotazioni e sale.
+
+## Gestione stagionale sale — inverno / estate (migrazione 0012)
+
+La gestione invernale utilizza sempre la piantina del piano terra. Se i tavoli
+compatibili sono esauriti, il sito accetta una prenotazione al **primo piano**
+anche quando `rooms.public_enabled=0`, senza costruire una piantina e senza
+assegnare alcun tavolo. Le persone vengono conteggiate nella capienza massima
+del primo piano **per data e servizio**.
+
+**Prerequisito obbligatorio sul database di produzione:** applicare la migrazione
+`migrations/0012_primo_piano_overflow.sql` alla D1 collegata al Worker.
+È una modifica dei trigger di integrità, non una cancellazione di prenotazioni.
+
+```bash
+npx wrangler d1 migrations apply oasi-db --remote
+```
+
+Verificare prima che `wrangler.toml` punti al database corretto ed esportare
+un backup. La distribuzione automatica dei file JS/CSS **non** garantisce
+l'esecuzione delle migrazioni D1.
+
+In `ADMIN → Orari e regole`:
+1. Selezionare **Inverno**.
+2. Impostare la **capienza reale del primo piano** (il valore 0 tiene disattivata la funzione).
+3. Attivare **Consenti primo piano senza piantina in inverno**.
+4. Salvare. Non è necessario abilitare il primo piano come sala online in `Sale e ambienti`.
+5. Provare un servizio di test: riempire i tavoli del piano terra, controllare
+   che il sito indichi «Primo piano» e che la nuova prenotazione compaia
+   in agenda **senza tavolo assegnato**.
+6. Controllare che la capienza massima, i blocchi di sala e gli eventi privati
+   impediscano nuove prenotazioni quando non ci sono posti.
+
+In estate selezionare **Estate**, abilitare la veranda alle prenotazioni online
+in `Sale e ambienti` e verificare la piantina/tavoli della veranda.
+L'overflow invernale si disattiva automaticamente per le nuove prenotazioni.
+Le prenotazioni già confermate rimangono in archivio e vanno gestite dal personale.
+
+**Non impostare capienze fittizie** per attivare l'overflow. Definire il
+numero reale di coperti gestibili al primo piano con il ristorante.
+
+**Limitazione importante:** la modalità stagionale è globale per il calendario
+di nuove prenotazioni. Nel cambio stagione, verificare con il personale che
+gli eventuali servizi futuri già prenotati siano nelle sale corrette.
