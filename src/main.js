@@ -853,6 +853,46 @@ const oasiRecommendStaffTables=(tables,party,links=[])=>{
  }
  return best?best.sort((a,b)=>a-b):[];
 };
+// Proposta non vincolante per i banchetti: gruppi anche separati nella stessa sala.
+// L'operatore mantiene la scelta finale; il server verifica sempre la disponibilità.
+const oasiRecommendBanquetTables=(tables,party,links=[])=>{
+ if(!Number.isInteger(party)||party<1||party>200)return [];
+ const eligible=tables.filter(t=>Number(t.enabled)!==0&&Number(t.seats)>0&&Number(t.min_seats||1)<=party);
+ const rooms=[...new Set(eligible.map(t=>Number(t.room_id)))].filter(Number.isSafeInteger);
+ let best=null,bestScore=null;
+ for(const room of rooms){
+  const arr=eligible.filter(t=>Number(t.room_id)===room);
+  const trials=[
+   [...arr].sort((a,b)=>Number(b.seats)-Number(a.seats)||Number(a.id)-Number(b.id)),
+   [...arr].sort((a,b)=>Number(a.seats)-Number(b.seats)||Number(a.id)-Number(b.id)),
+   [...arr].sort((a,b)=>Math.abs(Number(a.seats)-party)-Math.abs(Number(b.seats)-party))
+  ];
+  for(const ordered of trials){
+   for(const root of ordered){
+    const remaining=ordered.filter(t=>Number(t.id)!==Number(root.id));
+    const picked=[root];let min=Number(root.min_seats||1),max=Number(root.seats);
+    while(max<party&&picked.length<20){
+     const choices=remaining.filter(t=>min+Number(t.min_seats||1)<=party);
+     if(!choices.length)break;
+     choices.sort((a,b)=>{
+      const adjacent=t=>picked.some(p=>links.some(l=>(Number(l.table_a)===Number(p.id)&&Number(l.table_b)===Number(t.id))||(Number(l.table_b)===Number(p.id)&&Number(l.table_a)===Number(t.id))));
+      const connectedA=adjacent(a)?1:0,connectedB=adjacent(b)?1:0;
+      const capacityA=Number(a.seats),capacityB=Number(b.seats);
+      const surplusA=Math.max(0,max+capacityA-party),surplusB=Math.max(0,max+capacityB-party);
+      return (connectedB-connectedA)*100+(surplusA-surplusB)*2+(capacityB-capacityA);
+     });
+     const chosen=choices[0];picked.push(chosen);remaining.splice(remaining.indexOf(chosen),1);
+     min+=Number(chosen.min_seats||1);max+=Number(chosen.seats);
+    }
+    if(min>party||max<party)continue;
+    const score=[picked.length,max-party,party-min,room];
+    const differing=bestScore?score.findIndex((v,i)=>v!==bestScore[i]):-1;
+    if(!bestScore||(differing>=0&&score[differing]<bestScore[differing])){bestScore=score;best=picked.map(t=>Number(t.id))}
+   }
+  }
+ }
+ return best||[];
+};
 function openEditBookingDrawer(row){if(row)openNewBookingDrawer(null,row)}
 function openNewBookingDrawer(_event=null,editing=null){
  const banquet=!!_event?.banquet;
@@ -870,7 +910,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="Numero di telefono"></label>
    <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
    <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
-   ${banquet&&!editing?`<section class="oasi-banquet-tables"><h3>Tavoli del banchetto</h3><p>Seleziona fino a 20 tavoli: puoi riservare più gruppi verticali separati (es. 4 + 2 e 3 + 5 + 6). Gli altri tavoli restano prenotabili.</p><label>Sala<select id="oasi-banquet-room"></select></label><div id="oasi-banquet-list" aria-live="polite"></div><p id="oasi-banquet-capacity" aria-live="polite"></p><button class="mini" type="button" id="oasi-banquet-refresh">Aggiorna disponibilità</button></section>`:editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
+   ${banquet&&!editing?`<section class="oasi-banquet-tables"><h3>Tavoli del banchetto</h3><p>Seleziona fino a 20 tavoli: puoi riservare più gruppi verticali separati (es. 4 + 2 e 3 + 5 + 6). Gli altri tavoli restano prenotabili.</p><label>Sala<select id="oasi-banquet-room"></select></label><div id="oasi-banquet-list" aria-live="polite"></div><p id="oasi-banquet-capacity" aria-live="polite"></p><div class="oasi-banquet-actions"><button class="mini" type="button" id="oasi-banquet-suggest">Suggerisci tavoli</button><button class="mini" type="button" id="oasi-banquet-clear">Deseleziona tutti</button><button class="mini" type="button" id="oasi-banquet-refresh">Aggiorna disponibilità</button></div></section>`:editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
    <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
    <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
    <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">${editing?'Salva modifiche':'Registra prenotazione'}</button></footer>
@@ -974,7 +1014,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    return {valid,selected};
   };
   const paint=()=>{
-   const available=tables.filter(t=>Number(t.room_id)===Number(roomEl.value));
+   const available=tables.filter(t=>Number(t.room_id)===Number(roomEl.value)).sort((a,b)=>String(a.code).localeCompare(String(b.code),'it',{numeric:true}));
    list.innerHTML=available.length?available.map(t=>'<label class="oasi-banquet-table"><input type="checkbox" value="'+Number(t.id)+'" '+(chosen.has(Number(t.id))?'checked':'')+'><span><strong>Tavolo '+esc(t.code)+'</strong> · '+Number(t.min_seats||1)+'–'+Number(t.seats)+' posti</span></label>').join(''):'<p>Nessun tavolo libero in questa sala per il servizio selezionato.</p>';
    check();
   };
@@ -1001,6 +1041,14 @@ function openNewBookingDrawer(_event=null,editing=null){
   form.elements.date.addEventListener('change',load);
   form.elements.service.addEventListener('change',load);
   form.querySelector('#oasi-banquet-refresh').addEventListener('click',load);
+  form.querySelector('#oasi-banquet-clear').addEventListener('click',()=>{chosen.clear();paint()});
+  form.querySelector('#oasi-banquet-suggest').addEventListener('click',()=>{
+   if(loading)return;
+   const party=Number(form.elements.party_size.value),available=tables.filter(t=>Number(t.room_id)===Number(roomEl.value));
+   const ids=oasiRecommendBanquetTables(available,party,banquetLinks);
+   if(!ids.length){msg('Non ci sono tavoli liberi con capienza sufficiente in questa sala.','error');return}
+   chosen=new Set(ids);paint();msg('Proposta pronta. Verifica i tavoli e salva per confermare.');
+  });
   form._oasiBanquetSelection=()=>{const selected=check();return selected.valid?{table_ids:selected.selected.map(t=>Number(t.id)),room_id:Number(roomEl.value)}:null};
   load();
  }
