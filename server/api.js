@@ -90,11 +90,17 @@ async function eventRoomBlocked(db,date,service,roomId){
  AND (e.service='both' OR e.service=?) LIMIT 1`).bind(roomId,date,service).first();
  return row;
 }
+async function oasiReleasedArchiveReady(db){
+ return !!(await db.prepare("SELECT 1 ok FROM oasi_schema_versions WHERE version=13").first().catch(()=>null));
+}
 async function operationsData(db,date,service){
  
  const filter=service==='all'?'':' AND r.service=?';const params=service==='all'?[date]:[date,service];
+ const codes=(await oasiReleasedArchiveReady(db))
+  ? "COALESCE(GROUP_CONCAT(t.code,', '),(SELECT GROUP_CONCAT(h.table_code,', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id))"
+  : "GROUP_CONCAT(t.code,', ')";
  const [reservations,rooms,tables,blocks,eventRows,zones,links]=await db.batch([
-  db.prepare(`SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(v.note,'') visit_note,GROUP_CONCAT(t.id) table_ids,COALESCE(GROUP_CONCAT(t.code,', '),(SELECT GROUP_CONCAT(h.table_code,', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id)) table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=?${filter} GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id`).bind(...params),
+  db.prepare(`SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(v.note,'') visit_note,GROUP_CONCAT(t.id) table_ids,${codes} table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=?${filter} GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id`).bind(...params),
   db.prepare('SELECT id,name,public_enabled,internal_enabled FROM rooms ORDER BY sort_order,id'),
   db.prepare('SELECT t.*,COALESCE(d.min_seats,1) min_seats FROM tables t LEFT JOIN table_details d ON d.table_id=t.id ORDER BY t.room_id,t.id'),
   db.prepare("SELECT * FROM service_blocks WHERE book_date=? "+(service==='all'?'':'AND service=? ')+"ORDER BY service,scope,id").bind(...params),
@@ -430,10 +436,13 @@ if(resource==='analytics'&&method==='GET'){
  if(days>366)return fail('Seleziona al massimo 367 giorni per report');
  if(!['all','lunch','dinner'].includes(service)||!Number.isInteger(roomId)||roomId<0)return fail('Filtri non validi');
  
+ const historicCodes=(await oasiReleasedArchiveReady(db))
+  ? "COALESCE((SELECT GROUP_CONCAT(t.code,', ') FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id WHERE rt.reservation_id=r.id),(SELECT GROUP_CONCAT(h.table_code,', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id))"
+  : "(SELECT GROUP_CONCAT(t.code,', ') FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id WHERE rt.reservation_id=r.id)";
  const baseQuery=`SELECT r.id,r.book_date,r.service,r.time,r.room_id,r.party_size,r.status,r.source,r.name,r.phone,r.email,
  COALESCE(v.state,'expected') visit_state,
  (SELECT cr.customer_id FROM oasi_customer_reservations cr WHERE cr.reservation_id=r.id LIMIT 1) customer_id,
- COALESCE((SELECT GROUP_CONCAT(t.code,', ') FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id WHERE rt.reservation_id=r.id),(SELECT GROUP_CONCAT(h.table_code,', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id)) table_codes
+ ${historicCodes} table_codes
  FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE `;
  const getRows=async(from,to)=>{const args=[from,to];let clause='r.book_date>=? AND r.book_date<=?';if(service!=='all'){clause+=' AND r.service=?';args.push(service)}if(roomId){clause+=' AND r.room_id=?';args.push(roomId)}return (await db.prepare(baseQuery+clause+' ORDER BY r.book_date,r.service,r.time,r.id').bind(...args).all()).results||[]};
  const shift=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
@@ -556,7 +565,7 @@ if(resource==='visits'){
  const terminal=['finished','no_show'],closing=terminal.includes(state);
  if(terminal.includes(res.visit_state))return fail('Servizio già chiuso. Il tavolo è stato liberato e lo stato non può essere riaperto.',409);
  if(closing&&res.book_date>today())return fail('Non puoi chiudere come terminata o non presentata una prenotazione futura.',409);
- if(!(await db.prepare('SELECT 1 ok FROM oasi_schema_versions WHERE version=13').first().catch(()=>null)))
+ if(!(await oasiReleasedArchiveReady(db)))
   return fail('Aggiornamento database richiesto: applica la migrazione 0013 prima di cambiare gli stati.',503);
  const timestamp=now();
  try{
@@ -677,7 +686,7 @@ if(resource==='tables'){
  }
  if(method==='DELETE'){const id=Number(parts[2]);const count=await db.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE table_id=?').bind(id).first();if(count.n)return fail('Questo tavolo ha prenotazioni storiche: disattivalo invece di eliminarlo');await db.batch([db.prepare('DELETE FROM table_links WHERE table_a=? OR table_b=?').bind(id,id),db.prepare('DELETE FROM table_details WHERE table_id=?').bind(id),db.prepare('DELETE FROM tables WHERE id=?').bind(id)]);return json({ok:true})}
 }
-if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(GROUP_CONCAT(t.code, ', '),(SELECT GROUP_CONCAT(h.table_code, ', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id)) table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);const closed=await db.prepare("SELECT state FROM service_visits WHERE reservation_id=? AND state IN ('finished','no_show')").bind(id).first();if(closed)return fail('Servizio già chiuso: la prenotazione rimane nello storico e non è più modificabile o annullabile.',409);if(b.action==='edit_full'){
+if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const codes=(await oasiReleasedArchiveReady(db))?"COALESCE(GROUP_CONCAT(t.code, ', '),(SELECT GROUP_CONCAT(h.table_code, ', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id))":"GROUP_CONCAT(t.code, ', ')";const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,"+codes+" table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);const closed=await db.prepare("SELECT state FROM service_visits WHERE reservation_id=? AND state IN ('finished','no_show')").bind(id).first();if(closed)return fail('Servizio già chiuso: la prenotazione rimane nello storico e non è più modificabile o annullabile.',409);if(b.action==='edit_full'){
  const fields=['book_date','service','time','party_size','name','phone','email','notes','room_id','status'];
  const snapshot=b.expected;
  const originalIds=(await db.prepare('SELECT table_id FROM reservation_tables WHERE reservation_id=? ORDER BY table_id').bind(id).all()).results.map(t=>Number(t.table_id));
