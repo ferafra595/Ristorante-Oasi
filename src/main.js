@@ -128,7 +128,7 @@ const bindPublic=()=>{const evtForm=$('#event-request');if(evtForm)evtForm.addEv
  const bookingClientValidation=()=>{
   const data=f.elements,day=data.date.value,svc=data.service.value,time=data.time.value,party=Number(data.party_size.value);
   const todayRome=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'});
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(day))return ['Seleziona una data valida per la prenotazione.','date'];
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return ['Seleziona una data valida per la prenotazione.','date'];
   if(day<todayRome)return ['Non puoi prenotare per una data già trascorsa. Scegli un altro giorno.','date'];
   const ahead=new Date();ahead.setDate(ahead.getDate()+(Number(bcfg.maxDaysAhead)||90));
   if(day>ahead.toLocaleDateString('en-CA',{timeZone:'Europe/Rome'}))return ['Questa data è troppo lontana. Seleziona un giorno più vicino.','date'];
@@ -138,7 +138,7 @@ const bindPublic=()=>{const evtForm=$('#event-request');if(evtForm)evtForm.addEv
    return ['Il ristorante è chiuso nella data selezionata. Scegli un altro giorno.','date'];
   const hours=bcfg[svc]||{},name=svc==='dinner'?'cena':'pranzo';
   if(hours.enabled===false)return ['Il servizio '+name+' non è disponibile. Seleziona un altro servizio.','service'];
-  if(!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time))return ['Seleziona un orario di arrivo valido.','time'];
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return ['Seleziona un orario di arrivo valido.','time'];
   const start=hours.start||'00:00',last=hours.last||hours.end||'23:59';
   if(time<start)return ['Per il servizio '+name+' puoi prenotare a partire dalle '+start+'. Seleziona un orario successivo.','time'];
   if(time>last)return ['Ultimo orario prenotabile per il servizio '+name+': '+last+'. Seleziona un orario precedente.','time'];
