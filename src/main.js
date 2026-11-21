@@ -781,7 +781,7 @@ const oasiRecommendStaffTables=(tables,party)=>{
   for(const option of dp.values()){
    if(!option.ids.length||option.min>party||option.max<party)continue;
    const score=[option.ids.length,option.max-party,party-option.min,room,...option.ids];
-   if(!bestScore||score.some((n,i)=>n!==bestScore[i]&&score.slice(0,i).every((v,j)=>v===bestScore[j)&&n<bestScore[i])){
+   if(!bestScore||score.findIndex((n,i)=>n!==bestScore[i])>=0&&score[score.findIndex((n,i)=>n!==bestScore[i])]<bestScore[score.findIndex((n,i)=>n!==bestScore[i])]){
     bestScore=score;best=option;
    }
   }
