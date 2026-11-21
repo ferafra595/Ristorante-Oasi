@@ -204,7 +204,7 @@ const oasiSortedRows=rows=>[...(rows||[])].sort((a,b)=>String(a.id??'').localeCo
 function oasiSyncSignature(snapshot){
  if(snapshot.calendar)return JSON.stringify(oasiStableValue(snapshot));
  const reservations=oasiSortedRows(snapshot.reservations).map(r=>[r.id,r.status,r.visit_state,r.visit_note,r.book_date,r.service,r.time,r.party_size,r.name,r.phone,r.email,r.notes,r.room_id,String(r.table_ids||'').split(',').sort().join(','),r.table_codes,r.source]);
- return JSON.stringify(oasiStableValue({reservations,tables:oasiSortedRows(snapshot.tables),rooms:oasiSortedRows(snapshot.rooms),blocks:oasiSortedRows(snapshot.blocks),zones:oasiSortedRows(snapshot.zones)}));
+ return JSON.stringify(oasiStableValue({reservations,tables:oasiSortedRows(snapshot.tables),rooms:oasiSortedRows(snapshot.rooms),blocks:oasiSortedRows(snapshot.blocks),zones:oasiSortedRows(snapshot.zones),links:oasiSortedRows(snapshot.links)}));
 }
 let oasiRenderSerial=0,oasiRenderPending=0;
 function oasiSyncSafeToRender(){
