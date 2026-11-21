@@ -35,6 +35,24 @@ test('migration 0011 is idempotent; cannot mutate critical data without migratio
 test('atomic creation: failure after header leaves no reservation or table',async()=>{const x=await setup();x.db.failAt=(stmts,i)=>isBookingBatch(stmts)&&i===1;rejected(await x.book());assert.equal(x.rows().length,0);assert.equal(x.db.sql.prepare('SELECT COUNT(*) n FROM reservation_tables').get().n,0)});
 test('two concurrent requests for the same table: exactly one succeeds',async()=>{const x=await setup();const r=await Promise.all([x.book(),x.book()]);assert.equal(r.filter(x=>x.status===201).length,1);assert.equal(x.rows().length,1);assert.deepEqual(x.assigned(x.rows()[0].id),[1]);});
 test('manual multi-table 12 people, 1 reservation, 2 links; rejects duplicates and insufficient capacity',async()=>{const x=await setup();rejected(await x.book([1,1],8));rejected(await x.book([3],5));const r=await x.book([1,2],12);ok(r,201);assert.deepEqual(x.assigned(r.body.id),[1,2]);assert.equal(x.rows().length,1);rejected(await x.book([2],5));});
+test('banchetto condiviso: più gruppi di tavoli sotto una sola prenotazione, senza bloccare gli altri',async()=>{
+ const x=await setup();
+ rejected(await x.book([1,2,3],18));
+ const result=await x.book([1,2,3],18,{banquet_shared:true});
+ ok(result,201);
+ assert.deepEqual(x.assigned(result.body.id),[1,2,3]);
+ assert.equal(x.rows()[0].source,'staff_banquet');
+ rejected(await x.book([2],5));
+ ok(await x.book([6],2),201);
+ assert.equal(x.rows().length,2);
+});
+test('banchetto condiviso: rifiuta tavoli di sale diverse, occupati o insufficienti',async()=>{
+ const x=await setup();
+ rejected(await x.book([1,4],12,{banquet_shared:true}));
+ rejected(await x.book([1,3],20,{banquet_shared:true}));
+ ok(await x.book([1,3],9,{banquet_shared:true}),201);
+ rejected(await x.book([1,2],12,{banquet_shared:true}));
+});
 test('blocks for table, room, service; same date dinner unaffected',async()=>{const x=await setup();ok(await x.block('table',1));rejected(await x.book());ok(await x.block('room',2));rejected(await x.book([4]));ok(await x.block('service',0));rejected(await x.book([3],2));ok(await x.book([1],5,{service:'dinner',time:'19:30'}),201);});
 test('manual block inserted between validation and transaction still prevents booking',async()=>{const x=await setup();x.db.beforeBatch=(stmts,db)=>{if(!isBookingBatch(stmts))return false;db.sql.prepare("INSERT INTO service_blocks(book_date,service,scope,target_id,reason,created_at) VALUES(?,'lunch','table',1,'Race',CURRENT_TIMESTAMP)").run(date);return true};rejected(await x.book());assert.equal(x.rows().length,0)});
 test('disabled room cannot be selected explicitly; disabled tables excluded',async()=>{const x=await setup();x.db.sql.exec('UPDATE rooms SET internal_enabled=0 WHERE id=2');rejected(await x.book([4],5,{room_id:2}));rejected(await x.book([5],5));assert.equal(x.rows().length,0)});
