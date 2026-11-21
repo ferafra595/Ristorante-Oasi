@@ -22,7 +22,7 @@ test('Gruppi grandi richiedono selezione e consenso esplicito',()=>{
  assert.ok(src.includes('id="oasi-large-party"'));
  assert.ok(src.includes('id="oasi-join-confirm"'));
  assert.ok(src.includes('form._oasiLargeValid='));
- assert.ok(src.includes('if(!editing&&!form._oasiLargeValid?.())'));
+ assert.ok(src.includes('if(!editing&&!banquet&&!form._oasiLargeValid?.())'));
 });
 test('Per il banchetto condiviso non vengono bloccate le sale',()=>{
  assert.ok(src.includes('id="oasi-partial-banquet"'));
@@ -55,4 +55,10 @@ test('Allineamento verticale: 4+2 e 3+5+6 sono permessi; 5+4 laterale no',()=>{
  assert.equal(near(row3,row5),true);
  assert.equal(near(row5,row6),true);
  assert.equal(near(row4,row5),false);
+});
+
+test('Il banchetto condiviso supporta più gruppi di tavoli senza blocco sala',()=>{
+ assert.ok(src.includes('id="oasi-banquet-list"'));
+ assert.ok(src.includes('form._oasiBanquetSelection='));
+ assert.ok(src.includes('if(banquet)payload.banquet_shared=true'));
 });
