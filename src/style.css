@@ -1645,3 +1645,15 @@ body.oasi-booking-drawer-open{overflow:hidden}
 #oasi-pick-joined-tables{background:#edf4ea;border-color:#b9ceb1;color:#31512a;font-weight:700}
 #oasi-linked-table-choices:empty{display:none}
 @media(max-width:700px){.oasi-join-actions{flex-direction:column}.oasi-join-actions>.mini{width:100%;flex:auto}}
+
+/* Oasi: selezione multipla dei tavoli per banchetti con sala condivisa */
+.oasi-banquet-tables{padding:18px;border:1px solid #ddcfbb;background:#fbf7f0;border-radius:16px}
+.oasi-banquet-tables h3{margin:0 0 6px}
+.oasi-banquet-tables p{font-size:14px;line-height:1.5;color:#645343}
+#oasi-banquet-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-height:350px;overflow:auto;margin:14px 0}
+.oasi-banquet-table{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #e0d5c4;background:#fff;border-radius:12px;cursor:pointer}
+.oasi-banquet-table:has(input:checked){background:#edf4e9;border-color:#99b895}
+.oasi-banquet-table input{width:19px;height:19px;flex:0 0 auto;accent-color:#557a52}
+#oasi-banquet-capacity{font-weight:650}
+#oasi-banquet-refresh{min-height:40px}
+@media(max-width:640px){.oasi-banquet-tables{padding:13px}#oasi-banquet-list{grid-template-columns:1fr;max-height:300px}}
