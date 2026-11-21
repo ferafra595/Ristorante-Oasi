@@ -116,7 +116,7 @@ function openAdminSearch(){
 }
 function bindAdminTools(){
  $('#admin-search-open')?.addEventListener('click',openAdminSearch);
- $('#admin-shortcut-new')?.addEventListener('click',()=>{if(state.adminView==='service'||state.adminView==='dashboard')state.reservationService=state.opsService||'lunch';openNewBookingDrawer()});
+ $('#admin-shortcut-new')?.addEventListener('click',()=>{if(state.adminView==='service'||state.adminView==='dashboard')state.reservationService=state.adminView==='service'?state.opsService:oasiItalianService();openNewBookingDrawer()});
  $('#admin-shortcut-refresh')?.addEventListener('click',()=>renderAdmin());
  document.querySelectorAll('[data-admin-goto]').forEach(b=>b.addEventListener('click',()=>adminGoTo(b.dataset.adminGoto)));
 }
@@ -761,7 +761,7 @@ function openNewBookingDrawer(_event=null,editing=null){
  const old=document.querySelector('.oasi-booking-drawer-layer');
  if(old){old.querySelector('.oasi-booking-drawer-close')?.click();if(old.isConnected)return;}
  const layer=document.createElement('div');layer.className='oasi-booking-drawer-layer';
- const startService=editing?editing.service:((state.reservationService==='dinner'||(state.reservationService==='all'&&state.opsService==='dinner'))?'dinner':'lunch');
+ const startService=editing?editing.service:(state.reservationService==='all'?oasiItalianService():state.reservationService);
  layer.innerHTML=`<button type="button" class="oasi-booking-drawer-shade" aria-label="Chiudi nuova prenotazione"></button>
  <aside class="oasi-booking-drawer" role="dialog" aria-modal="true" aria-labelledby="oasi-new-book-title" tabindex="-1">
   <header class="oasi-booking-drawer-header"><div><span class="eyebrow">RISTORANTE OASI · ADMIN</span><h2 id="oasi-new-book-title">${editing?'Modifica prenotazione #'+Number(editing.id):'Nuova prenotazione'}</h2><p>${editing?'Modifica tutti i dati e scegli i tavoli disponibili.':'Inserisci una prenotazione telefonica. Il tavolo viene assegnato in base alla disponibilità.'}</p></div><button class="oasi-booking-drawer-close" type="button" aria-label="Chiudi pannello">×</button></header>
@@ -851,7 +851,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    const payload=inputData(form);
    if(!editing){delete payload.suggested_table;const selection=form._oasiSelectedRecommendation?.();if(selection){payload.room_id=selection.room_id;payload.table_ids=selection.table_ids}}
    created=editing?await api('admin/reservations/'+editing.id,'PATCH',{...payload,action:'edit_full',table_ids:selectedTables,expected}):await api('admin/reservations','POST',payload);
-   state.date=payload.date;state.reservationService=payload.service;if(editing){state.adminView='reservations';}
+   state.date=payload.date;state.reservationService='all';state.agendaManualSelection=payload.date!==oasiItalianToday();if(editing){state.adminView='reservations';}
    const savedRows=await api('admin/reservations?date='+encodeURIComponent(payload.date)+'&service='+encodeURIComponent(payload.service));
    if(!savedRows.some(r=>Number(r.id)===Number(created.id))){
     msg('Salvataggio confermato, ma prenotazione non ancora visibile nell’agenda. Non ripetere il salvataggio: verifica in D1.','error');
