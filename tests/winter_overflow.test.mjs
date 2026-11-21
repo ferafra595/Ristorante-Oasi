@@ -65,7 +65,7 @@ test('Inverno: capacità reale, blocchi e cerimonie impediscono overbooking',asy
  const over=await t.book(1);assert.notEqual(over.status,201);
  assert.equal(t.db.sql.prepare("SELECT COUNT(*) n FROM reservations WHERE room_id=2 AND status='confirmed'").get().n,1);
  const b=setup();await b.book(2);
- b.db.sql.prepare("INSERT INTO service_blocks(book_date,service,scope,target_id,reason) VALUES(?,?,?,?,?)").run(date,'dinner','room',2,'Chiuso');
+ b.db.sql.prepare("INSERT INTO service_blocks(book_date,service,scope,target_id,reason,created_at) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)").run(date,'dinner','room',2,'Chiuso');
  assert.equal((await b.available(3)).body.available,false);
 });
 test('Estate: nessun overflow al primo piano; veranda disponibile solo se attiva',async()=>{
