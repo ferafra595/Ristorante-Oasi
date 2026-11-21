@@ -1689,3 +1689,44 @@ body.oasi-booking-drawer-open{overflow:hidden}
 .oasi-readiness-ok{color:#30603c}
 .oasi-readiness-warning{color:#99522d}
 @media(max-width:800px){.oasi-readiness-grid{grid-template-columns:1fr}}
+
+
+/* OASI — formati fotografici uniformi, indipendenti dall'orientamento del file.
+   L'immagine originale rimane invariata: cover ritaglia soltanto la presentazione.
+   Non coinvolgere loghi, lightbox (foto intera) o anteprime upload (foto intera). */
+body.oasi-public :is(.oasi-story-visual,.dedicated-story-visual,.event-story-media,.oasi-editorial-photo-grid>a,.dedicated-gallery-item,.event-offer-card,.oasi-event-photos,.booking-side,.oasi-editorial-hero,.event-hero-photo){min-width:0}
+body.oasi-public :is(.oasi-story-visual,.dedicated-story-visual,.event-story-media)>img,
+body.oasi-public .oasi-editorial-photo-grid>a>img,
+body.oasi-public .dedicated-gallery-item>img,
+body.oasi-public .event-offer-card>img,
+body.oasi-public .oasi-event-photos>img,
+body.oasi-public .booking-side>img{
+ display:block;width:100%;max-width:100%;height:auto;object-fit:cover;object-position:center center;
+}
+/* Hero panoramici: occupano sempre il contenitore, anche con foto verticali. */
+body.oasi-public .oasi-editorial-hero>.oasi-hero-photo,
+body.oasi-public .event-hero-photo>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center}
+/* Foto editoriali: stessa proporzione per ogni formato caricato. */
+body.oasi-public :is(.oasi-story-visual,.dedicated-story-visual,.event-story-media)>img{
+ aspect-ratio:5/4;height:auto;min-height:0;
+}
+/* Blocchi home: riquadri stabili, mai allungati dalle immagini originali. */
+body.oasi-public .oasi-editorial-photo-grid>a{display:block;position:relative;aspect-ratio:4/5;overflow:hidden}
+body.oasi-public .oasi-editorial-photo-grid>a>img{width:100%;height:100%;aspect-ratio:auto}
+/* Card e galleria: formato orizzontale coerente. */
+body.oasi-public .dedicated-gallery-item{display:block;position:relative;aspect-ratio:4/3;height:auto;min-height:0;overflow:hidden}
+body.oasi-public .dedicated-gallery-item>img{width:100%;height:100%;aspect-ratio:auto}
+body.oasi-public .event-offer-card>img{aspect-ratio:4/3;height:auto}
+body.oasi-public .oasi-event-photos>img{aspect-ratio:4/3;height:auto}
+/* Fotografia a fianco della prenotazione. */
+body.oasi-public .booking-side>img{aspect-ratio:4/5;height:auto}
+/* Il lightbox conserva l'intera foto senza ritaglio: indispensabile per immagini verticali. */
+body.oasi-public .gallery-lightbox img{width:auto;height:auto;max-width:100%;max-height:77vh;object-fit:contain;aspect-ratio:auto}
+/* Le anteprime dell'ADMIN preservano l'immagine intera prima di caricarla. */
+body:not(.oasi-public) .oasi-media-preview img{object-fit:contain}
+@media(max-width:760px){
+ body.oasi-public .oasi-editorial-photo-grid>a{aspect-ratio:4/5}
+ body.oasi-public .dedicated-gallery-item{aspect-ratio:4/3;height:auto}
+ body.oasi-public :is(.oasi-story-visual,.dedicated-story-visual,.event-story-media)>img{aspect-ratio:5/4;height:auto}
+ body.oasi-public .oasi-event-photos>img{aspect-ratio:4/3;height:auto}
+}
