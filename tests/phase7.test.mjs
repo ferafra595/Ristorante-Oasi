@@ -50,3 +50,17 @@ test('restore geometry succeeds with confirmed booking, conflicting standard res
 test('floor restore transaction rolls back on failure after table updates',async()=>{const x=await setup();ok(await x.call('admin/floor-template','PUT',{room_id:1}));x.db.sql.exec('UPDATE tables SET x=44 WHERE id=1');x.db.failAt=(stmts,i)=>stmts[0].q.includes('WITH snapshot')&&i===7;rejected(await x.call('admin/floor-template','POST',{room_id:1}));assert.equal(x.db.sql.prepare('SELECT x FROM tables WHERE id=1').get().x,44);assert.equal(x.db.sql.prepare('SELECT COUNT(*) n FROM room_zones').get().n,1);});
 test('reserved table config protected, public and admin API auth preserved, operations includes event/block/zone snapshot',async()=>{const x=await setup();ok(await x.book(),201);assert.throws(()=>x.db.sql.exec('UPDATE tables SET enabled=0 WHERE id=1'),/oasi_reserved_table_configuration/);assert.throws(()=>x.db.sql.exec('UPDATE table_details SET min_seats=7 WHERE table_id=1'),/oasi_reserved_table_configuration/);ok(await x.block('table',3));ok(await x.event([2]),201);const r=await x.call('admin/operations?date='+date+'&service=lunch');ok(r);assert.equal(r.body.blocks.length,2);assert.equal(r.body.zones.length,1);assert.equal((await x.call('admin/operations?date='+date,'GET',undefined,false)).status,401);});
 test('public booking path, public-only room admission, no email configured; customer and notification preserved',async()=>{const x=await setup();const d=new Date();d.setUTCDate(d.getUTCDate()+7);const day=d.toISOString().slice(0,10);const cfg=JSON.parse(x.db.sql.prepare("SELECT value FROM settings WHERE key='booking'").get().value);cfg.weekdays=[0,1,2,3,4,5,6];cfg.closedDates=[];x.db.sql.prepare("UPDATE settings SET value=? WHERE key='booking'").run(JSON.stringify(cfg));const r=await x.call('book','POST',{date:day,time:'12:30',service:'lunch',party_size:2,name:'Web test',phone:'0000000000',email:'web@example.invalid'},false);ok(r,201);assert.equal(r.body.room_id,1);assert.equal(r.body.email_status,'unconfigured');assert.equal(x.db.sql.prepare('SELECT COUNT(*) n FROM oasi_customer_reservations').get().n,1);assert.equal(x.db.sql.prepare('SELECT COUNT(*) n FROM oasi_staff_notifications').get().n,1);});
+
+
+test('online cancellation keeps booked tables after service starts and releases only expected reservations',async()=>{
+ const x=await setup();
+ const a=await x.book([1],5);ok(a,201);
+ const token=new URL(a.body.cancel_url).searchParams.get('token');assert.ok(token);
+ ok(await x.call('admin/visits/'+a.body.id,'PATCH',{state:'seated'}));
+ const blocked=await x.call('cancel','POST',{token},false);assert.equal(blocked.status,409,JSON.stringify(blocked.body));
+ assert.deepEqual(x.assigned(a.body.id),[1]);assert.equal(x.rows().find(r=>r.id===a.body.id).status,'confirmed');
+ const b=await x.book([2],5);ok(b,201);
+ const token2=new URL(b.body.cancel_url).searchParams.get('token');assert.ok(token2);
+ ok(await x.call('cancel','POST',{token:token2},false));
+ assert.deepEqual(x.assigned(b.body.id),[]);assert.equal(x.rows().find(r=>r.id===b.body.id).status,'cancelled');
+});
