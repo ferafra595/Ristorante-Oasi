@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 
 const server=readFileSync(new URL('../server/api.js',import.meta.url),'utf8');
 const frontend=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
-const begin=server.indexOf('function oasiConnectedTableIds=');
+const begin=server.indexOf('function oasiConnectedTableIds(');
 const end=server.indexOf('async function oasiLinkedTables',begin);
 assert.ok(begin>=0&&end>begin,'Verifica collegamenti sul server non trovata');
 const connected=new Function(server.slice(begin,end)+'return oasiConnectedTableIds;')();
