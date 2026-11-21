@@ -124,8 +124,8 @@ async function candidates(db,roomIds,date,service,party){
  const allLinks=(await db.prepare('SELECT table_a,table_b FROM table_links').all()).results;
  const byId=new Map(free.map(t=>[t.id,t]));const adj=new Map(free.map(t=>[t.id,[]]));
  for(const link of allLinks){const a=byId.get(link.table_a),b=byId.get(link.table_b);if(a&&b&&a.room_id===b.room_id){adj.get(a.id).push(b.id);adj.get(b.id).push(a.id)}}
- const seen=new Set();
- for(const root of free){const queue=[[root.id]];while(queue.length){const group=queue.shift();if(group.length>=8)continue;const next=new Set(group.flatMap(id=>adj.get(id)||[]));for(const id of next){if(group.includes(id))continue;const ids=[...group,id].sort((a,b)=>a-b);const key=ids.join('-');if(seen.has(key))continue;seen.add(key);const members=ids.map(i=>byId.get(i));const capacity=members.reduce((s,t)=>s+t.seats,0),minimum=members.reduce((s,t)=>s+Number(t.min_seats||1),0);if(capacity>=party&&minimum<=party)options.push({ids,room_id:root.room_id,capacity,code:members.map(t=>t.code).join('+')});if(ids.length<8)queue.push(ids)}}}
+ const seen=new Set();let explored=0;
+ for(const root of free){const queue=[[root.id]];while(queue.length&&explored<25000){explored++;const group=queue.shift();if(group.length>=8)continue;const next=new Set(group.flatMap(id=>adj.get(id)||[]));for(const id of next){if(group.includes(id))continue;const ids=[...group,id].sort((a,b)=>a-b);const key=ids.join('-');if(seen.has(key))continue;seen.add(key);const members=ids.map(i=>byId.get(i));const capacity=members.reduce((s,t)=>s+t.seats,0),minimum=members.reduce((s,t)=>s+Number(t.min_seats||1),0);if(capacity>=party&&minimum<=party)options.push({ids,room_id:root.room_id,capacity,code:members.map(t=>t.code).join('+')});if(ids.length<8)queue.push(ids)}}}
  return rankTableOptions(options,party);
 }
 // Una combinazione di tavoli è valida solo se forma una rete connessa
