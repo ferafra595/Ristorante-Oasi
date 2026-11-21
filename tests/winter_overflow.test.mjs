@@ -47,7 +47,7 @@ function setup(){
  };
  const book=(party_size,changes={})=>request('book','POST',{date,time:'19:30',service:'dinner',party_size,name:'Cliente '+(++id),email:'guest'+id+'@example.com',phone:'3390000000',...changes});
  const available=(party_size=2)=>request('availability?date='+date+'&service=dinner&time=19:30&party_size='+party_size);
- return {db,request,book,available};
+ return {db,env,request,book,available};
 }
 test('Inverno: piano terra prioritario, poi primo piano disattivato senza tavoli',async()=>{
  const t=setup();
@@ -81,4 +81,27 @@ test('Inverno: il primo piano è disattivabile dall\'ADMIN senza toccare i dati'
  const t=setup();await t.book(2);
  t.db.sql.exec("UPDATE settings SET value=json_set(value,'$.firstFloorOverflowEnabled',json('false')) WHERE key='booking'");
  assert.equal((await t.available(3)).body.available,false);
+});
+
+test('ADMIN: modifica prenotazione al primo piano senza obbligare a scegliere un tavolo',async()=>{
+ const t=setup();
+ await t.book(2);const original=await t.book(4);
+ assert.equal(original.status,201,JSON.stringify(original.body));
+ const row=t.db.sql.prepare('SELECT * FROM reservations WHERE id=?').get(original.body.id);
+ const response=await onRequest({request:new Request('https://oasi.test/api/admin/login',{
+   method:'POST',headers:{Origin:'https://oasi.test','Content-Type':'application/json','CF-Connecting-IP':'192.0.2.55'},
+   body:JSON.stringify({password:'password-test'})
+ }),env:{...t.env,ADMIN_PASSWORD:'password-test'}});
+ assert.equal(response.status,200);
+ const cookie=response.headers.get('set-cookie').split(';')[0];
+ const fields=['book_date','service','time','party_size','name','phone','email','notes','room_id','status'];
+ const expected={...Object.fromEntries(fields.map(key=>[key,row[key]])),table_ids:[]};
+ const edit=await onRequest({request:new Request('https://oasi.test/api/admin/reservations/'+row.id,{
+   method:'PATCH',headers:{Origin:'https://oasi.test','Content-Type':'application/json','Cookie':cookie},
+   body:JSON.stringify({action:'edit_full',expected,table_ids:[],room_id:2,date,service:'dinner',time:'19:30',party_size:5,name:row.name,phone:row.phone,email:row.email,notes:row.notes})
+ }),env:{...t.env,ADMIN_PASSWORD:'password-test'}});
+ assert.equal(edit.status,200,await edit.text());
+ const updated=t.db.sql.prepare('SELECT room_id,party_size FROM reservations WHERE id=?').get(row.id);
+ assert.equal(updated.room_id,2);assert.equal(updated.party_size,5);
+ assert.equal(t.db.sql.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE reservation_id=?').get(row.id).n,0);
 });
