@@ -124,7 +124,7 @@ async function oasiOverflowCandidate(db,cfg,date,service,party,excludeId=0){
  // La piantina del primo piano non è necessaria; non assegniamo tavoli fittizi.
  const blocks=await serviceBlocks(db,date,service);
  if(blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===2)))return null;
- const existing=await db.prepare("SELECT COALESCE(SUM(party_size),0) n FROM reservations WHERE room_id=2 AND book_date=? AND service=? AND status='confirmed' AND id<>?").bind(date,service,excludeId).first();
+ const existing=await db.prepare("SELECT COALESCE(SUM(r.party_size),0) n FROM reservations r WHERE r.room_id=2 AND r.book_date=? AND r.service=? AND r.status='confirmed' AND r.id<>? AND NOT EXISTS(SELECT 1 FROM service_visits v WHERE v.reservation_id=r.id AND v.state IN ('finished','no_show'))").bind(date,service,excludeId).first();
  const used=Number(existing?.n||0),cap=Number(cfg.firstFloorOverflowCapacity);
  if(used+party>cap)return null;
  return {ids:[],room_id:2,capacity:cap-used,code:'Senza tavolo · Primo piano',overflow:true};
@@ -441,7 +441,7 @@ if(resource==='analytics'&&method==='GET'){
  const [original,prior,rs]=await Promise.all([getRows(start,end),getRows(previous.start,previous.end),db.prepare('SELECT id,name FROM rooms ORDER BY sort_order,id').all()]);
  const rooms=rs.results||[];const roomName=id=>rooms.find(z=>Number(z.id)===Number(id))?.name||'Sala non specificata';
  const rows=original.map(r=>({...r,room_name:roomName(r.room_id)}));
- const currentDay=today();const isVisit=r=>r.status==='confirmed'&&['seated','finished'].includes(r.visit_state)&&r.book_date<=currentDay;
+ const currentDay=today();const isVisit=r=>r.status==='confirmed'&&['arrived','seated','finished'].includes(r.visit_state)&&r.book_date<=currentDay;
  const summarize=records=>{const valid=records.filter(r=>r.status==='confirmed'),visits=valid.filter(isVisit),cancelled=records.filter(r=>r.status==='cancelled');return {bookings:valid.length,covers:valid.reduce((n,r)=>n+Number(r.party_size||0),0),visits:visits.length,visited_covers:visits.reduce((n,r)=>n+Number(r.party_size||0),0),cancelled:cancelled.length,no_show:valid.filter(r=>r.visit_state==='no_show').length,finished:valid.filter(r=>r.visit_state==='finished').length,avg_party:valid.length?Number((valid.reduce((n,r)=>n+Number(r.party_size||0),0)/valid.length).toFixed(1)):0}};
  const summary=summarize(rows),previousSummary=summarize(prior);
  const visits=rows.filter(isVisit);const visitCounts=new Map();for(const r of visits){if(r.customer_id)visitCounts.set(r.customer_id,(visitCounts.get(r.customer_id)||0)+1)}
@@ -475,9 +475,9 @@ if(resource==='customers'){
   }
   const sql=`SELECT c.*,
    (SELECT COUNT(*) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id WHERE cr.customer_id=c.id) total_bookings,
-   (SELECT COUNT(*) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=c.id AND r.status='confirmed' AND COALESCE(v.state,'expected') IN ('seated','finished') AND r.book_date<=?) actual_visits,
+   (SELECT COUNT(*) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=c.id AND r.status='confirmed' AND COALESCE(v.state,'expected') IN ('arrived','seated','finished') AND r.book_date<=?) actual_visits,
    (SELECT MAX(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id WHERE cr.customer_id=c.id) last_booking,
-   (SELECT MAX(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=c.id AND r.status='confirmed' AND COALESCE(v.state,'expected') IN ('seated','finished') AND r.book_date<=?) last_visit,
+   (SELECT MAX(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=c.id AND r.status='confirmed' AND COALESCE(v.state,'expected') IN ('arrived','seated','finished') AND r.book_date<=?) last_visit,
    (SELECT MIN(r.book_date) FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id WHERE cr.customer_id=c.id AND r.status='confirmed' AND r.book_date>=?) next_booking
    FROM oasi_customers c WHERE (?='' OR c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?) ORDER BY COALESCE(last_booking,'') DESC,c.name LIMIT 250`;
   const results=await db.prepare(sql).bind(today(),today(),today(),q,'%'+q+'%','%'+q+'%','%'+q+'%').all();
@@ -506,10 +506,10 @@ if(resource==='customer-history'&&method==='GET'){
  const result=await db.prepare(sql).bind(id).all();
  const bookings=result.results||[];
  const stats=await db.prepare(`SELECT COUNT(*) bookings,
- SUM(CASE WHEN r.status='confirmed' AND r.book_date<=? AND COALESCE(v.state,'expected') IN ('seated','finished') THEN 1 ELSE 0 END) visits,
+ SUM(CASE WHEN r.status='confirmed' AND r.book_date<=? AND COALESCE(v.state,'expected') IN ('arrived','seated','finished') THEN 1 ELSE 0 END) visits,
  SUM(CASE WHEN r.status='cancelled' THEN 1 ELSE 0 END) cancelled,
  SUM(CASE WHEN COALESCE(v.state,'expected')='no_show' THEN 1 ELSE 0 END) no_shows,
- MAX(CASE WHEN r.status='confirmed' AND r.book_date<=? AND COALESCE(v.state,'expected') IN ('seated','finished') THEN r.book_date END) last_visit
+ MAX(CASE WHEN r.status='confirmed' AND r.book_date<=? AND COALESCE(v.state,'expected') IN ('arrived','seated','finished') THEN r.book_date END) last_visit
  FROM oasi_customer_reservations cr JOIN reservations r ON r.id=cr.reservation_id LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE cr.customer_id=?`).bind(today(),today(),id).first();
  return json({customer,bookings,stats:stats||{}})
 }
@@ -677,7 +677,7 @@ if(resource==='tables'){
  }
  if(method==='DELETE'){const id=Number(parts[2]);const count=await db.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE table_id=?').bind(id).first();if(count.n)return fail('Questo tavolo ha prenotazioni storiche: disattivalo invece di eliminarlo');await db.batch([db.prepare('DELETE FROM table_links WHERE table_a=? OR table_b=?').bind(id,id),db.prepare('DELETE FROM table_details WHERE table_id=?').bind(id),db.prepare('DELETE FROM tables WHERE id=?').bind(id)]);return json({ok:true})}
 }
-if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(GROUP_CONCAT(t.code, ', '),(SELECT GROUP_CONCAT(h.table_code, ', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id)) table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);if(b.action==='edit_full'){
+if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url).searchParams;const date=q.get('date')||today(),service=q.get('service')||'all';if(!dateOk(date))return fail('Data non valida');if(!['all','lunch','dinner'].includes(service))return fail('Servizio non valido');const sql="SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(GROUP_CONCAT(t.code, ', '),(SELECT GROUP_CONCAT(h.table_code, ', ') FROM oasi_released_table_assignments h WHERE h.reservation_id=r.id)) table_codes,GROUP_CONCAT(t.id) table_ids FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=? "+(service==='all'?'':'AND r.service=? ')+"GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id";const statement=db.prepare(sql);const rows=await (service==='all'?statement.bind(date):statement.bind(date,service)).all();return json(rows.results)}if(method==='POST'){try{return json(await saveBooking(ctx,b,true),201)}catch(e){return fail(e.message)}}if(method==='PATCH'){const id=+parts[2];const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(id).first();if(!old)return fail('Prenotazione non trovata',404);const closed=await db.prepare("SELECT state FROM service_visits WHERE reservation_id=? AND state IN ('finished','no_show')").bind(id).first();if(closed)return fail('Servizio già chiuso: la prenotazione rimane nello storico e non è più modificabile o annullabile.',409);if(b.action==='edit_full'){
  const fields=['book_date','service','time','party_size','name','phone','email','notes','room_id','status'];
  const snapshot=b.expected;
  const originalIds=(await db.prepare('SELECT table_id FROM reservation_tables WHERE reservation_id=? ORDER BY table_id').bind(id).all()).results.map(t=>Number(t.table_id));
