@@ -586,15 +586,30 @@ function printOasiReservations(mode='plan'){
   return edges.join(' ');
  };
  const listTable=items=>`<table class="bookings"><thead><tr><th>Ora</th><th>Cliente</th><th>Persone</th><th>Tavolo</th><th>Telefono</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.time)}</td><td>${esc(r.name)}</td><td>${cleanNumber(r.party_size)}</td><td>${esc(r.table_codes||'Non assegnato')}</td><td>${esc(r.phone||'')}</td></tr>`).join('')||'<tr><td colspan="5">Nessuna prenotazione confermata</td></tr>'}</tbody></table>`;
- const svgRoom=(room,tables,zones,structures,items)=>{
+ const svgRoom=(room,tables,zones,structures,items,links=[])=>{
   const roomTables=tables.filter(t=>Number(t.room_id)===Number(room.id)&&t.enabled!==0);
   const roomZones=zones.filter(z=>Number(z.room_id)===Number(room.id));
   const roomStructures=structures.filter(f=>Number(f.room_id)===Number(room.id));
   const zoneRects=roomZones.map(rect);
   // La cornice deve seguire la SALA, non l'intera area dell'editor.
   const bounds=boxOf(zoneRects.length?zoneRects:roomTables.map(rect),20);
-  const assignment=new Map();
-  for(const r of items.filter(r=>Number(r.room_id)===Number(room.id)))for(const id of String(r.table_ids||'').split(',').map(Number).filter(Boolean))assignment.set(id,r);
+  const roomBookings=items.filter(r=>Number(r.room_id)===Number(room.id)).sort((a,b)=>String(a.time).localeCompare(String(b.time))||Number(a.id)-Number(b.id));
+  const assignment=new Map(),references=new Map();
+  roomBookings.forEach((r,index)=>{references.set(Number(r.id),index+1);for(const id of String(r.table_ids||'').split(',').map(Number).filter(Boolean))assignment.set(id,r)});
+  const byId=new Map(roomTables.map(t=>[Number(t.id),t]));
+  // Unione esclusivamente per tavoli della stessa prenotazione, collegati fisicamente in verticale.
+  const bridges=links.flatMap(link=>{
+   const a=byId.get(Number(link.table_a)),b=byId.get(Number(link.table_b));
+   if(!a||!b||!oasiNearbyTable(a,b))return [];
+   const bookingA=assignment.get(Number(a.id)),bookingB=assignment.get(Number(b.id));
+   if(!bookingA||!bookingB||Number(bookingA.id)!==Number(bookingB.id))return [];
+   const ra=rect(a),rb=rect(b),top=ra.y<=rb.y?ra:rb,bottom=ra.y<=rb.y?rb:ra;
+   const gap=bottom.y-(top.y+top.h);
+   if(gap<0||gap>90)return [];
+   const left=Math.max(top.x,bottom.x),right=Math.min(top.x+top.w,bottom.x+bottom.w);
+   const center=(left+right)/2,barWidth=Math.min(24,Math.max(12,(right-left)*.42));
+   return ['<rect class="print-joined-bridge" x="'+(center-barWidth/2)+'" y="'+(top.y+top.h-3)+'" width="'+barWidth+'" height="'+(gap+6)+'" rx="3" fill="#d2e6d5" stroke="#396849" stroke-width="2.2"/>'];
+  }).join('');
   const clipId='room-clip-'+room.id;
   const hasZones=zoneRects.length>0;
   const zoneShapes=zoneRects.map(r=>`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`).join('');
@@ -606,24 +621,16 @@ function printOasiReservations(mode='plan'){
   }).join('');
   const tableSvg=roomTables.map(t=>{
    const r=rect(t),cx=r.x+r.w/2,cy=r.y+r.h/2;
-   const booking=assignment.get(Number(t.id));
-   const occupied=!!booking;
+   const booking=assignment.get(Number(t.id)),occupied=!!booking;
    const shape=t.shape==='circle'?`<ellipse cx="${cx}" cy="${cy}" rx="${r.w/2}" ry="${r.h/2}"/>`:`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="9"/>`;
-   const name=String(booking?.name||'').trim();
-   const small=Math.min(r.w,r.h)<64;
-   const codeFont=small?17:22;
-   const nameFont=small?9:11.5;
-   const maxTextW=Math.max(18,r.w-10);
-   const codeY=occupied?cy-(small?17:23):cy+codeFont*.33;
-   const words=name.split(/\s+/).filter(Boolean);
-   const first=words.length>1?words[0]:name;
-   const second=words.length>1?words.slice(1).join(' '):'';
-   const nameLine=(part,y)=>{const len=Math.min(maxTextW,Math.max(12,part.length*nameFont*.52));return `<text x="${cx}" y="${y}" font-size="${nameFont}" font-weight="700" textLength="${len}" lengthAdjust="spacingAndGlyphs">${esc(part)}</text>`};
-   const guestText=booking?`${cleanNumber(booking.party_size)} ${cleanNumber(booking.party_size)===1?'persona':'persone'}`:'';
-   return `<g transform="rotate(${cleanNumber(t.rotation)},${cx},${cy})"><g fill="${occupied?'#d9e7db':'#e9dcc8'}" stroke="${occupied?'#4e7855':'#9e8768'}" stroke-width="2">${shape}</g><g fill="#30291f" font-family="Arial,sans-serif" text-anchor="middle"><text x="${cx}" y="${codeY}" font-size="${codeFont}" font-weight="700">${esc(t.code)}</text>${occupied?`${nameLine(first,cy-4)}${second?nameLine(second,cy+10):''}<text x="${cx}" y="${cy+(second?25:17)}" font-size="9.5">${esc(guestText)}</text>`:''}</g></g>`;
+   const small=Math.min(r.w,r.h)<62;
+   const codeFont=small?18:24,refFont=small?10:11.5;
+   const ref=booking?'P'+references.get(Number(booking.id)):'';
+   const codeY=occupied?cy-3:cy+codeFont*.34;
+   return `<g transform="rotate(${cleanNumber(t.rotation)},${cx},${cy})"><g fill="${occupied?'#d7e9dc':'#f2e9dc'}" stroke="${occupied?'#356546':'#957d5d'}" stroke-width="${occupied?'3':'2.2'}">${shape}</g><g fill="#1e3024" font-family="Arial,Helvetica,sans-serif" text-anchor="middle"><text x="${cx}" y="${codeY}" font-size="${codeFont}" font-weight="800">${esc(t.code)}</text>${occupied?`<text x="${cx}" y="${cy+refFont+4}" font-size="${refFont}" font-weight="800" letter-spacing=".7" fill="#315b40">${esc(ref)}</text>`:''}</g></g>`;
   }).join('');
   const clip=`<clipPath id="${clipId}">${hasZones?zoneShapes:`<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}"/>`}</clipPath>`;
-  const drawing=`<defs>${clip}</defs><rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}" fill="#fffdfa"/><g clip-path="url(#${clipId})"><g fill="#f1e6d5">${zoneShapes}</g>${cols}${tableSvg}</g>${border}`;
+  const drawing=`<defs>${clip}</defs><rect x="${bounds.x}" y="${bounds.y}" width="${bounds.w}" height="${bounds.h}" fill="#fffdfa"/><g clip-path="url(#${clipId})"><g fill="#f1e6d5">${zoneShapes}</g>${cols}${bridges}${tableSvg}</g>${border}`;
   return {svg:`<svg class="room-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Piantina ${esc(room.name)}">${drawing}</svg>`,portrait:bounds.h>=bounds.w*1.05};
  };
  const buildPage=(heading,sub,content,landscape=false,kind='plan',svc='')=>`<section class="sheet ${landscape?'landscape':'portrait'} ${kind}"><header class="sheet-head"><div><div class="brand">L’OASI<span class="dot">.</span></div><div class="tagline">F.LLI FERA · DAL 1997</div></div><div class="head-right"><strong>${esc(dayLabel)}</strong><span>${esc(serviceLabel(svc || (selected==='all'?'lunch':selected)))}</span></div></header><div class="sheet-title"><div><span class="eyebrow">${kind==='plan'?'PIANTINA E PRENOTAZIONI':'ELENCO PRENOTAZIONI'}</span><h1>${kind==='plan'?esc(serviceLabel(svc)):esc(heading)}</h1>${kind==='plan'?`<p class="sheet-room-name">${esc(heading)}</p>`:''}</div><div class="sheet-counter">${esc(sub)}</div></div>${content}<footer class="sheet-foot"><span>RISTORANTE OASI · ROCCABERNARDA</span><span>Uso interno · ${esc(dayLabel)}</span></footer></section>`;
@@ -654,7 +661,7 @@ function printOasiReservations(mode='plan'){
  const generated=[];
  (async()=>{
   try{
-   const [rooms,tables,zones,structures]=mode==='plan'?await Promise.all([api('admin/rooms'),api('admin/tables'),api('admin/room-zones'),api('admin/floor-elements')]):[[],[],[],[]];
+   const [rooms,tables,zones,structures,links]=mode==='plan'?await Promise.all([api('admin/rooms'),api('admin/tables'),api('admin/room-zones'),api('admin/floor-elements'),api('admin/table-links')]):[[],[],[],[],[]];
    for(const svc of services){
     const items=booked.filter(r=>r.service===svc);
     if(mode==='list'){
@@ -663,7 +670,7 @@ function printOasiReservations(mode='plan'){
     }
     const roomIds=[...new Set(items.map(r=>Number(r.room_id)).filter(Boolean))];
     for(const room of rooms.filter(r=>roomIds.includes(Number(r.id)))){
-     const {svg,portrait}=svgRoom(room,tables,zones,structures,items);
+     const {svg,portrait}=svgRoom(room,tables,zones,structures,items,links);
      const roomBookings=items.filter(r=>Number(r.room_id)===Number(room.id));
      const count=roomBookings.length, totalGuests=roomBookings.reduce((n,r)=>n+Number(r.party_size||0),0);
      const tableHeight=Math.max(22,Math.min(80,11+count*7));
