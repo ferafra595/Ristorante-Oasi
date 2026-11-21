@@ -354,7 +354,7 @@ if(tab==='dashboard'){
 if(tab==='service'){
  const service=state.opsService||'lunch';const data=syncSnapshot||await api('admin/operations?date='+encodeURIComponent(state.date)+'&service='+service);const zones=Array.isArray(data.zones)?data.zones:await api('admin/room-zones');if(serial!==oasiRenderSerial)return;state.operations=data;renderedSnapshot={...data,zones};
  const stats=operationalStats(data,service);const active=stats.reservations;const roomIds=[...new Set([...data.rooms.map(r=>r.id),...data.tables.map(t=>t.room_id)])];
- html=heading('Servizio e sala','Arrivi, disposizione tavoli e blocchi. Nessun tavolo si libera automaticamente durante il servizio.')+opsDateControls(service)+oasiServiceMobileCards(active)+opPills(stats)+`<div class="op-service-layout"><section class="panel"><div class="op-panel-heading"><h3>Piantina operativa · ${opServiceLabel(service)}</h3><span class="op-muted">Tocca un tavolo per prenotare, modificare o bloccare</span></div><div class="op-legend"><span>● Disponibile</span><span>● Prenotato</span><span>● Al tavolo</span><span>● Non presentato</span></div>${data.rooms.filter(r=>roomIds.includes(r.id)&&data.tables.some(t=>t.room_id===r.id)).map(r=>`<div class="op-room"><h4>${esc(r.name)}</h4>${floorOpsSvg(data.tables.filter(t=>t.room_id===r.id),zones.filter(z=>z.room_id===r.id),active.filter(b=>b.room_id===r.id),r.internal_enabled?data.blocks:[...data.blocks,{scope:'room',target_id:r.id}])}</div>`).join('')}<div id="op-table-detail" class="op-table-detail"><p>Tocca un tavolo per aprire il pannello rapido a destra.</p></div></section><section class="panel"><div class="op-panel-heading"><h3>Blocchi disponibilità</h3></div><p class="op-muted">I blocchi impediscono solo <strong>nuove assegnazioni</strong>. Le prenotazioni confermate restano valide.</p><form id="op-block-form" class="op-block-form"><label>Cosa bloccare?<select name="scope"><option value="service">Intero servizio</option><option value="room">Una sala</option><option value="table">Un tavolo</option></select></label><label>Elemento<select name="target_id"><option value="0">Intero servizio</option></select></label><label>Motivo (facoltativo)<input name="reason" placeholder="Es. manutenzione"></label><button class="btn btn-dark" type="submit">Blocca disponibilità</button></form><h4>Blocchi attivi</h4><div class="op-blocks">${stats.blocked.length?stats.blocked.map(b=>`<div class="op-block"><div><strong>${b.scope==='service'?'Intero servizio':b.scope==='room'?(data.rooms.find(r=>r.id===b.target_id)?.name||'Sala'):('Tavolo '+(data.tables.find(t=>t.id===b.target_id)?.code||b.target_id))}</strong><small>${esc(b.reason||'Nessuna nota')}</small></div>${b.source==='event'?`<button type="button" class="mini" data-quick="events">Apri evento</button>`:`<button type="button" class="mini" data-remove-block="${b.id}">Sblocca</button>`}</div>`).join(''):'<p class="op-muted">Nessun blocco attivo.</p>'}</div></section></div><section class="panel op-service-list"><div class="op-panel-heading"><h3>Clienti del servizio</h3><button type="button" class="mini" data-quick="reservations">Apri prenotazioni</button></div>${operationalTable(active)}</section>`;
+ html=heading('Servizio e sala','Arrivi, disposizione tavoli e blocchi. Nessun tavolo si libera automaticamente durante il servizio.')+opsDateControls(service)+oasiServiceMobileCards(active)+opPills(stats)+`<div class="op-service-layout"><section class="panel"><div class="op-panel-heading"><h3>Piantina operativa · ${opServiceLabel(service)}</h3><div class="oasi-sala-head-actions"><button type="button" class="mini" id="oasi-partial-banquet">+ Banchetto con sala condivisa</button><span class="op-muted">Tocca un tavolo per prenotare, modificare o bloccare</span></div></div><div class="op-legend"><span>● Disponibile</span><span>● Prenotato</span><span>● Al tavolo</span><span>● Non presentato</span></div>${data.rooms.filter(r=>roomIds.includes(r.id)&&data.tables.some(t=>t.room_id===r.id)).map(r=>`<div class="op-room"><h4>${esc(r.name)}</h4>${floorOpsSvg(data.tables.filter(t=>t.room_id===r.id),zones.filter(z=>z.room_id===r.id),active.filter(b=>b.room_id===r.id),r.internal_enabled?data.blocks:[...data.blocks,{scope:'room',target_id:r.id}])}</div>`).join('')}<div id="op-table-detail" class="op-table-detail"><p>Tocca un tavolo per aprire il pannello rapido a destra.</p></div></section><section class="panel"><div class="op-panel-heading"><h3>Blocchi disponibilità</h3></div><p class="op-muted">I blocchi impediscono solo <strong>nuove assegnazioni</strong>. Le prenotazioni confermate restano valide.</p><form id="op-block-form" class="op-block-form"><label>Cosa bloccare?<select name="scope"><option value="service">Intero servizio</option><option value="room">Una sala</option><option value="table">Un tavolo</option></select></label><label>Elemento<select name="target_id"><option value="0">Intero servizio</option></select></label><label>Motivo (facoltativo)<input name="reason" placeholder="Es. manutenzione"></label><button class="btn btn-dark" type="submit">Blocca disponibilità</button></form><h4>Blocchi attivi</h4><div class="op-blocks">${stats.blocked.length?stats.blocked.map(b=>`<div class="op-block"><div><strong>${b.scope==='service'?'Intero servizio':b.scope==='room'?(data.rooms.find(r=>r.id===b.target_id)?.name||'Sala'):('Tavolo '+(data.tables.find(t=>t.id===b.target_id)?.code||b.target_id))}</strong><small>${esc(b.reason||'Nessuna nota')}</small></div>${b.source==='event'?`<button type="button" class="mini" data-quick="events">Apri evento</button>`:`<button type="button" class="mini" data-remove-block="${b.id}">Sblocca</button>`}</div>`).join(''):'<p class="op-muted">Nessun blocco attivo.</p>'}</div></section></div><section class="panel op-service-list"><div class="op-panel-heading"><h3>Clienti del servizio</h3><button type="button" class="mini" data-quick="reservations">Apri prenotazioni</button></div>${operationalTable(active)}</section>`;
 }
 if(tab==='reservations'){
  const service=state.reservationService||'all';
@@ -840,6 +840,7 @@ const oasiRecommendStaffTables=(tables,party,links=[])=>{
 };
 function openEditBookingDrawer(row){if(row)openNewBookingDrawer(null,row)}
 function openNewBookingDrawer(_event=null,editing=null){
+ const banquet=!!_event?.banquet;
  // One drawer for the ADMIN agenda and the global quick-create shortcut.
  const old=document.querySelector('.oasi-booking-drawer-layer');
  if(old){old.querySelector('.oasi-booking-drawer-close')?.click();if(old.isConnected)return;}
@@ -847,14 +848,14 @@ function openNewBookingDrawer(_event=null,editing=null){
  const startService=editing?editing.service:(state.reservationService==='all'?oasiItalianService():state.reservationService);
  layer.innerHTML=`<button type="button" class="oasi-booking-drawer-shade" aria-label="Chiudi nuova prenotazione"></button>
  <aside class="oasi-booking-drawer" role="dialog" aria-modal="true" aria-labelledby="oasi-new-book-title" tabindex="-1">
-  <header class="oasi-booking-drawer-header"><div><span class="eyebrow">RISTORANTE OASI · ADMIN</span><h2 id="oasi-new-book-title">${editing?'Modifica prenotazione #'+Number(editing.id):'Nuova prenotazione'}</h2><p>${editing?'Modifica tutti i dati e scegli i tavoli disponibili.':'Inserisci una prenotazione telefonica. Il tavolo viene assegnato in base alla disponibilità.'}</p></div><button class="oasi-booking-drawer-close" type="button" aria-label="Chiudi pannello">×</button></header>
+  <header class="oasi-booking-drawer-header"><div><span class="eyebrow">RISTORANTE OASI · ADMIN</span><h2 id="oasi-new-book-title">${editing?'Modifica prenotazione #'+Number(editing.id):'Nuova prenotazione'}</h2><p>${editing?'Modifica tutti i dati e scegli i tavoli disponibili.':banquet?'Riserva soltanto i tavoli del banchetto: gli altri rimangono prenotabili.':'Inserisci una prenotazione telefonica. Il tavolo viene assegnato in base alla disponibilità.'}</p></div><button class="oasi-booking-drawer-close" type="button" aria-label="Chiudi pannello">×</button></header>
   <form id="oasi-booking-drawer-form" class="oasi-booking-drawer-form">
    <div class="oasi-booking-drawer-fields"><div class="oasi-booking-drawer-pair"><label>Data *<input name="date" type="date" value="${esc(state.date)}" required></label><label>Servizio *<select name="service"><option value="lunch" ${startService==='lunch'?'selected':''}>Pranzo</option><option value="dinner" ${startService==='dinner'?'selected':''}>Cena</option></select></label></div>
-   <div class="oasi-booking-drawer-pair"><label>Ora di arrivo *<input name="time" type="time" required value="${startService==='lunch'?'12:30':'19:30'}"></label><label>Persone *<input name="party_size" type="number" min="1" max="200" required value="2"></label></div>
+   <div class="oasi-booking-drawer-pair"><label>Ora di arrivo *<input name="time" type="time" required value="${startService==='lunch'?'12:30':'19:30'}"></label><label>Persone *<input name="party_size" type="number" min="1" max="200" required value="${banquet?12:2}"></label></div>
    <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="Numero di telefono"></label>
    <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
    <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
-   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p></section>`}
+   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
    <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
    <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
    <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">${editing?'Salva modifiche':'Registra prenotazione'}</button></footer>
@@ -879,6 +880,7 @@ function openNewBookingDrawer(_event=null,editing=null){
  layer.querySelector('.oasi-booking-drawer-close').onclick=close;
  layer.querySelector('.oasi-booking-drawer-cancel').onclick=close;
  document.addEventListener('keydown',onKey);
+ if(banquet&&!editing)form.elements.notes.value='Banchetto con sala condivisa. Riservare solo i tavoli assegnati.';
  const serviceInput=form.elements.service,timeInput=form.elements.time;
  serviceInput.addEventListener('change',()=>{const prev=timeInput.value;if(['12:30','19:30'].includes(prev))timeInput.value=serviceInput.value==='lunch'?'12:30':'19:30'});
  let selectedTables=[],available=[],freeTables=[],tableLinks=[],loading=false,loadVersion=0,expected=null;
@@ -913,11 +915,13 @@ function openNewBookingDrawer(_event=null,editing=null){
  }
  if(!editing){
   const suggestionSelect=form.elements.suggested_table,hint=form.querySelector('#oasi-suggestion-hint');
-  let suggestionVersion=0,suggestedOptions=[],suggestionTimer;
+  let suggestionVersion=0,suggestedOptions=[],suggestionTimer;const largePanel=form.querySelector('#oasi-large-party'),largeCheck=form.querySelector('#oasi-join-confirm');
+  const updateLargeParty=()=>{const large=Number(form.elements.party_size.value)>9;largePanel.hidden=!large;if(!large){largeCheck.checked=false;submit.disabled=false}else submit.disabled=!largeCheck.checked||suggestionSelect.value==='';};
+  largeCheck.addEventListener('change',updateLargeParty);
   const refreshSuggestions=async()=>{
    const version=++suggestionVersion;
    suggestionSelect.replaceChildren(new Option('Automatica · miglior tavolo disponibile',''));
-   suggestedOptions=[];
+   suggestedOptions=[];updateLargeParty();
    const date=form.elements.date.value,service=form.elements.service.value,party=Number(form.elements.party_size.value);
    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(party)||party<1||party>200){hint.textContent='Seleziona una data e un numero di persone validi.';return}
    hint.textContent='Verifica tavoli disponibili…';
@@ -927,26 +931,28 @@ function openNewBookingDrawer(_event=null,editing=null){
     if(version!==suggestionVersion||!layer.isConnected)return;
     suggestedOptions=result.options||[];
     suggestedOptions.forEach((o,i)=>suggestionSelect.add(new Option((i===0?'Consigliato · ':'')+'Tavolo '+o.code+' · '+o.room_name+' · '+o.capacity+' posti',String(i))));
-    hint.textContent=suggestedOptions.length?'Consigliato: tavolo '+suggestedOptions[0].code+' ('+suggestedOptions[0].room_name+'). Puoi confermare la scelta automatica o indicare un tavolo.':'Nessun tavolo compatibile disponibile per il servizio selezionato.';
+    hint.textContent=suggestedOptions.length?'Consigliato: '+suggestedOptions[0].code+' ('+suggestedOptions[0].room_name+'). Seleziona la combinazione desiderata.':'Nessuna combinazione disponibile. Da Servizio e sala, apri un tavolo e usa «Collega tavoli adiacenti», poi riprova.';updateLargeParty();
    }catch(e){if(version===suggestionVersion){hint.textContent='Suggerimenti non disponibili: il salvataggio verificherà comunque i tavoli.'}}
   };
-  const scheduleSuggestions=()=>{clearTimeout(suggestionTimer);suggestionSelect.replaceChildren(new Option('Automatica · miglior tavolo disponibile',''));suggestedOptions=[];hint.textContent='Aggiornamento disponibilità…';suggestionTimer=setTimeout(refreshSuggestions,220)};
+  const scheduleSuggestions=()=>{clearTimeout(suggestionTimer);suggestionSelect.replaceChildren(new Option('Automatica · miglior tavolo disponibile',''));suggestedOptions=[];hint.textContent='Aggiornamento disponibilità…';updateLargeParty();suggestionTimer=setTimeout(refreshSuggestions,220)};
   form.elements.date.addEventListener('change',scheduleSuggestions);
   form.elements.service.addEventListener('change',scheduleSuggestions);
   form.elements.party_size.addEventListener('input',scheduleSuggestions);
   form.dataset.suggestedSelection='automatic';
-  suggestionSelect.addEventListener('change',()=>{form.dataset.suggestedSelection=suggestionSelect.value===''?'automatic':'manual'});
+  suggestionSelect.addEventListener('change',()=>{form.dataset.suggestedSelection=suggestionSelect.value===''?'automatic':'manual';updateLargeParty()});
   form._oasiSelectedRecommendation=()=>suggestionSelect.value===''?null:suggestedOptions[Number(suggestionSelect.value)]||null;
+  form._oasiLargeValid=()=>Number(form.elements.party_size.value)<=9||(largeCheck.checked&&!!form._oasiSelectedRecommendation());
   refreshSuggestions();
  }
  customerAutocomplete(form);
  form.addEventListener('submit',async e=>{
   e.preventDefault();if(saving||submit.disabled)return;
+  if(!editing&&!form._oasiLargeValid?.()){msg('Per gruppi oltre 9 persone scegli i tavoli collegati e conferma l’unione.','error');return}
   saving=true;submit.disabled=true;submit.textContent='Salvataggio...';
   let created=null;
   try{
    const payload=inputData(form);
-   if(!editing){delete payload.suggested_table;const selection=form._oasiSelectedRecommendation?.();if(selection){payload.room_id=selection.room_id;payload.table_ids=selection.table_ids}}
+   if(!editing){delete payload.suggested_table;delete payload.join_tables;const selection=form._oasiSelectedRecommendation?.();if(selection){payload.room_id=selection.room_id;payload.table_ids=selection.table_ids}}
    created=editing?await api('admin/reservations/'+editing.id,'PATCH',{...payload,action:'edit_full',table_ids:selectedTables,expected}):await api('admin/reservations','POST',payload);
    state.date=payload.date;state.reservationService='all';state.agendaManualSelection=payload.date!==oasiItalianToday();if(editing){state.adminView='reservations';}
    const savedRows=await api('admin/reservations?date='+encodeURIComponent(payload.date)+'&service='+encodeURIComponent(payload.service));
@@ -975,6 +981,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
  $('#email-refresh')?.addEventListener('click',renderAdmin);
 
  const refreshAfterAction=async()=>{const y=window.scrollY;await renderAdmin();window.scrollTo({top:y,behavior:'instant'})};
+ $('#oasi-partial-banquet')?.addEventListener('click',()=>openNewBookingDrawer({banquet:true}));
  let oasiVisitSaving=false;
  const saveVisitState=async(id,value,control)=>{
   if(oasiVisitSaving||!Number.isSafeInteger(id)||id<=0||!Object.hasOwn(opLabel,value))return;
