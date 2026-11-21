@@ -273,6 +273,22 @@ const oasiServiceMobileCards=rows=>`<section class="oasi-service-mobile-cards" a
   <label class="oasi-service-guest-manual">Altri stati ${opSelect(r)}</label>
  </article>`}).join(''):'<p class="oasi-service-guest-empty">Nessuna prenotazione per il servizio selezionato.</p>'}</section>`;
 const operationalTable=(rows,includeService=false)=>`<div class="table-scroll"><table class="op-table"><thead><tr><th>Ora</th><th>Cliente</th><th>Ospiti</th><th>Tavolo</th>${includeService?'<th>Servizio</th>':''}<th>Stato operativo</th><th>Contatto</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr class="${r.status==='cancelled'?'reservation-cancelled':''}"><td>${esc(r.time)}</td><td><strong>${esc(r.name)}</strong>${r.notes?`<small class="op-muted">${esc(r.notes)}</small>`:''}</td><td>${Number(r.party_size)}</td><td>${esc(r.table_codes||'Non assegnato')}</td>${includeService?`<td>${opServiceLabel(r.service)}</td>`:''}<td>${r.status==='cancelled'?'Annullata':opSelect(r)}</td><td><a href="tel:${esc(String(r.phone||'').replace(/[^+0-9]/g,''))}">${esc(r.phone)}</a></td></tr>`).join(''):`<tr><td colspan="${includeService?7:6}" class="reservation-empty">Nessuna prenotazione per questo servizio.</td></tr>`}</tbody></table></div>`;
+// Agenda: due elenchi semplici e separati, anche quando si vedono entrambi i servizi.
+const oasiAgendaGroup=(reservations,service)=>{
+ const rows=reservations.filter(r=>r.service===service).sort((a,b)=>String(a.time||'').localeCompare(String(b.time||''))||Number(a.id)-Number(b.id));
+ const confirmed=rows.filter(r=>r.status==='confirmed'),covers=confirmed.reduce((n,r)=>n+Number(r.party_size||0),0);
+ const name=service==='lunch'?'Pranzo':'Cena';
+ return `<section class="oasi-agenda-group" aria-label="Prenotazioni ${name}">
+  <header class="oasi-agenda-group-heading"><div><span class="eyebrow">${service==='lunch'?'SERVIZIO DIURNO':'SERVIZIO SERALE'}</span><h3>${name}</h3></div><p><strong>${confirmed.length}</strong> prenotazioni · <strong>${covers}</strong> coperti</p></header>
+  <div class="oasi-agenda-entries">${rows.length?rows.map(r=>{
+   const active=r.status==='confirmed',phone=String(r.phone||'').replace(/[^+0-9]/g,''),visit=r.visit_state||'expected';
+   return `<article class="oasi-agenda-entry ${active?'':'is-cancelled'}">
+      <div class="oasi-agenda-entry-time"><time>${esc(r.time||'—')}</time><span class="oasi-agenda-entry-source">${r.source==='web'?'Online':'Staff'}</span></div>
+      <div class="oasi-agenda-entry-details"><h4>${esc(r.name)}</h4><p><strong>${Number(r.party_size)}</strong> ${Number(r.party_size)===1?'persona':'persone'} · ${esc(r.table_codes||'Tavolo da assegnare')}</p>${r.notes?`<p class="oasi-agenda-entry-note">${esc(r.notes)}</p>`:''}</div>
+      <div class="oasi-agenda-entry-side"><span class="oasi-agenda-visit-status ${active?'':'is-cancelled'}">${active?esc(opLabel[visit]||'In attesa'):'Annullata'}</span><div class="oasi-agenda-entry-actions">${active?`<button type="button" class="mini" data-move="${Number(r.id)}">Modifica</button><button type="button" class="mini danger" data-cancel="${Number(r.id)}">Annulla</button>`:''}${phone?`<a class="mini" href="tel:${esc(phone)}">Chiama</a>`:''}</div></div>
+    </article>`}).join(''):'<p class="oasi-agenda-empty">Nessuna prenotazione per questo servizio.</p>'}</div>
+ </section>`;
+};
 const opsDateControls=(svc)=>`<div class="op-toolbar"><label>Data<input id="admin-date" type="date" value="${esc(state.date)}"></label><label>Servizio<select id="ops-service"><option value="lunch" ${svc==='lunch'?'selected':''}>Pranzo</option><option value="dinner" ${svc==='dinner'?'selected':''}>Cena</option></select></label><button class="mini" id="op-today" type="button">Oggi</button><button class="mini" id="op-refresh" type="button">Aggiorna</button></div>`;
 const opPills=(stats)=>`<div class="op-kpis"><article><span>Prenotazioni</span><strong>${stats.bookings}</strong></article><article><span>Coperti</span><strong>${stats.covers}</strong></article><article><span>Tavoli liberi</span><strong>${stats.availableTables}</strong></article><article><span>In attesa</span><strong>${stats.waiting}</strong></article><article><span>Al tavolo</span><strong>${stats.seated}</strong></article><article><span>Da gestire</span><strong>${stats.arrived+stats.noShow}</strong></article></div>`;
 const floorOpsSvg=(tables,zones,bookings,blocks=[])=>{
