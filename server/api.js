@@ -1,4 +1,5 @@
 import {eventsAdmin} from './phase4.js';
+import {rankTableOptions} from './recommendations.js';
 import {auditAction,securityRoute,loginGuard,recordLogin,verifyAdminOrigin} from './phase5.js';
 import {syncCustomer,alertStaff,emailForBooking,emailStaff,sendEmailRecorded,validEmail} from './phase2.js';
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer',...headers}});
@@ -124,7 +125,7 @@ async function candidates(db,roomIds,date,service,party){
  for(const link of allLinks){const a=byId.get(link.table_a),b=byId.get(link.table_b);if(a&&b&&a.room_id===b.room_id){adj.get(a.id).push(b.id);adj.get(b.id).push(a.id)}}
  const seen=new Set();
  for(const root of free){const queue=[[root.id]];while(queue.length){const group=queue.shift();if(group.length>=6)continue;const next=new Set(group.flatMap(id=>adj.get(id)||[]));for(const id of next){if(group.includes(id))continue;const ids=[...group,id].sort((a,b)=>a-b);const key=ids.join('-');if(seen.has(key))continue;seen.add(key);const members=ids.map(i=>byId.get(i));const capacity=members.reduce((s,t)=>s+t.seats,0),minimum=members.reduce((s,t)=>s+Number(t.min_seats||1),0);if(capacity>=party&&minimum<=party)options.push({ids,room_id:root.room_id,capacity,code:members.map(t=>t.code).join('+')});if(ids.length<6)queue.push(ids)}}}
- return options.sort((a,b)=>a.capacity-b.capacity||a.ids.length-b.ids.length);
+ return rankTableOptions(options,party);
 }
 // Staff-only choice: a temporary group of free tables in the same room.
 // Does NOT modify the standard floor plan or allow public customers to bypass linked-table rules.
@@ -407,6 +408,17 @@ if(resource==='email-log'){
  
  if(method==='GET')return json({configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM),sender:ctx.env.EMAIL_FROM||'',items:(await db.prepare('SELECT id,reservation_id,recipient,email_type,subject,status,error,created_at,attempted_at FROM oasi_email_log ORDER BY id DESC LIMIT 100').all()).results||[]});
  return fail('Metodo non consentito',405)
+}
+if(resource==='suggestions'){
+ if(method!=='GET')return fail('Metodo non valido',405);
+ const query=new URL(ctx.request.url).searchParams;
+ const date=query.get('date')||today(),service=query.get('service')||'lunch',party=Number(query.get('party_size'));
+ if(!dateOk(date)||!['lunch','dinner'].includes(service)||!Number.isInteger(party)||party<1||party>200)return fail('Data, servizio o numero di persone non validi');
+ const roomRows=await db.prepare('SELECT id,name FROM rooms WHERE internal_enabled=1 ORDER BY sort_order,id').all();
+ const roomIds=(roomRows.results||[]).map(r=>Number(r.id));
+ const choices=await candidates(db,roomIds,date,service,party);
+ const labels=new Map((roomRows.results||[]).map(r=>[Number(r.id),r.name]));
+ return json({options:choices.slice(0,6).map(c=>({table_ids:c.ids,room_id:c.room_id,room_name:labels.get(Number(c.room_id))||'',code:c.code,capacity:c.capacity})),total:choices.length});
 }
 if(resource==='operations'){
  if(method!=='GET')return fail('Metodo non valido',405);
