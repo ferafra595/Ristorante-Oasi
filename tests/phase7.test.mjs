@@ -14,7 +14,7 @@ class D1 {
 const migrationFiles=readdirSync(new URL('../migrations/',import.meta.url)).filter(x=>x.endsWith('.sql')).sort();
 const date='2099-12-01';
 async function setup({migration=true}={}){
- const db=new D1();for(const name of migrationFiles){if(!migration&&(name.startsWith('0011')||name.startsWith('0012')))continue;db.sql.exec(readFileSync(new URL('../migrations/'+name,import.meta.url),'utf8'));}
+ const db=new D1();for(const name of migrationFiles){if(!migration&&(name.startsWith('0011')||name.startsWith('0012')||name.startsWith('0013')))continue;db.sql.exec(readFileSync(new URL('../migrations/'+name,import.meta.url),'utf8'));}
  db.sql.exec("INSERT INTO tables(id,room_id,code,seats,x,y,w,h,enabled) VALUES (1,1,'1',8,10,10,80,80,1),(2,1,'2',8,10,110,80,80,1),(3,1,'3',4,200,10,80,80,1),(4,2,'4',8,10,10,80,80,1),(5,1,'5',8,300,10,80,80,0),(6,1,'6',2,400,10,80,80,1); INSERT INTO table_details(table_id,min_seats,module_count) VALUES(1,4,1),(2,4,1),(3,1,1),(4,1,1),(5,1,1),(6,1,1); INSERT INTO table_links VALUES(1,2); INSERT INTO room_zones(room_id,label,x,y,w,h) VALUES(1,'Sala',0,0,600,400);");
  const env={DB:db,ADMIN_PASSWORD:'test-only-password',PUBLIC_URL:'https://oasi.test'};let cookie='';
  const call=async(path,method='GET',body,auth=true)=>{const headers={'Origin':'https://oasi.test','Sec-Fetch-Site':'same-origin','Content-Type':'application/json','CF-Connecting-IP':'192.0.2.1'};if(auth&&cookie)headers.Cookie=cookie;const r=await onRequest({request:new Request('https://oasi.test/api/'+path,{method,headers,body:body?JSON.stringify(body):undefined}),env});return {status:r.status,body:await r.json(),cookie:r.headers.get('set-cookie')};};
@@ -84,7 +84,7 @@ test('online cancellation keeps booked tables after service starts and releases 
  const x=await setup();
  const a=await x.book([1],5);ok(a,201);
  const token=new URL(a.body.cancel_url).searchParams.get('token');assert.ok(token);
- ok(await x.call('admin/visits/'+a.body.id,'PATCH',{state:'seated'}));
+ ok(await x.call('admin/visits/'+a.body.id,'PATCH',{state:'arrived'}));
  const blocked=await x.call('cancel','POST',{token},false);assert.equal(blocked.status,409,JSON.stringify(blocked.body));
  assert.deepEqual(x.assigned(a.body.id),[1]);assert.equal(x.rows().find(r=>r.id===a.body.id).status,'confirmed');
  const b=await x.book([2],5);ok(b,201);
@@ -123,20 +123,24 @@ test('ADMIN table suggestions preserve validations for date, service and party s
 });
 
 
-test('service arrival progression never releases or duplicates booked tables',async()=>{
+test('arrived preserves the table; finished releases it with historical table and allows new booking in same service',async()=>{
  const x=await setup();
- const reservation=await x.book([1],5);
+ const today=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'});
+ const reservation=await x.book([1],5,{date:today});
  ok(reservation,201);
  const id=reservation.body.id;
- for(const state of ['arrived','seated','finished']){
-  ok(await x.call('admin/visits/'+id,'PATCH',{state}));
-  const row=x.db.sql.prepare('SELECT state FROM service_visits WHERE reservation_id=?').get(id);
-  assert.equal(row.state,state);
-  assert.deepEqual(x.assigned(id),[1]);
-  assert.equal(x.rows().find(r=>r.id===id).status,'confirmed');
- }
- ok(await x.call('admin/visits/'+id,'PATCH',{state:'expected'}));
+ ok(await x.call('admin/visits/'+id,'PATCH',{state:'arrived'}));
  assert.deepEqual(x.assigned(id),[1]);
+ ok(await x.call('admin/visits/'+id,'PATCH',{state:'finished'}));
+ assert.deepEqual(x.assigned(id),[]);
+ assert.equal(x.rows()[0].status,'confirmed');
+ const h=x.db.sql.prepare('SELECT table_id,table_code,released_state FROM oasi_released_table_assignments WHERE reservation_id=?').get(id);
+ assert.deepEqual({...h},{table_id:1,table_code:'1',released_state:'finished'});
+ ok(await x.book([1],5,{date:today}),201);
+ rejected(await x.call('admin/visits/'+id,'PATCH',{state:'arrived'}));
+ const operations=await x.call('admin/operations?date='+today+'&service=lunch');
+ ok(operations);
+ assert.equal(operations.body.reservations.find(r=>r.id===id).table_codes,'1');
 });
 
 test('concorrenza: banchetto condiviso e prenotazione normale non possono occupare lo stesso tavolo',async()=>{
@@ -192,4 +196,16 @@ test('controlli di consegna ADMIN: solo autenticati, segreti mai restituiti',asy
  const response=JSON.stringify(status.body);
  assert.ok(!response.includes('test-only-password'));
  assert.ok(!response.includes('RESEND_API_KEY='));
+});
+
+test('no show releases table, preserves absence statistics, and cannot be reopened',async()=>{
+ const x=await setup(),today=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'});
+ const first=await x.book([1],5,{date:today});ok(first,201);
+ ok(await x.call('admin/visits/'+first.body.id,'PATCH',{state:'no_show'}));
+ assert.deepEqual(x.assigned(first.body.id),[]);
+ ok(await x.book([1],5,{date:today}),201);
+ const stats=await x.call('admin/analytics?start='+today+'&end='+today);ok(stats);
+ assert.equal(stats.body.summary.no_show,1);
+ assert.equal(stats.body.summary.visits,0);
+ rejected(await x.call('admin/visits/'+first.body.id,'PATCH',{state:'arrived'}));
 });
