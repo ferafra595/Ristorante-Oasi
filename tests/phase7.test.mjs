@@ -176,3 +176,20 @@ test('banchetto a pranzo non impedisce l\'utilizzo degli stessi tavoli a cena',a
  assert.deepEqual(x.assigned(lunch.body.id),[1,2,3]);
  assert.deepEqual(x.assigned(dinner.body.id),[1,2,3]);
 });
+
+test('controlli di consegna ADMIN: solo autenticati, segreti mai restituiti',async()=>{
+ const x=await setup();
+ const notLogged=await x.call('admin/readiness','GET',undefined,false);
+ assert.equal(notLogged.status,401);
+ const status=await x.call('admin/readiness');
+ ok(status);
+ assert.equal(status.body.database_ready,true);
+ assert.equal(status.body.admin_password_configured,true);
+ assert.equal(status.body.email_configured,false);
+ assert.equal(status.body.media_bucket_configured,false);
+ assert.ok(status.body.tables_enabled>=1);
+ assert.ok(status.body.rooms_enabled>=1);
+ const response=JSON.stringify(status.body);
+ assert.ok(!response.includes('test-only-password'));
+ assert.ok(!response.includes('RESEND_API_KEY='));
+});
