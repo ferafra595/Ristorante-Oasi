@@ -874,6 +874,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
   const wrap=document.createElement('div');wrap.className='op-drawer-layer';
   const details=booking?`<div class="op-drawer-summary"><strong>${esc(booking.name)}</strong><span>${Number(booking.party_size)} ospiti · ${esc(booking.time)} · ${esc(opServiceLabel(booking.service))}</span>${bookIds.length>1?`<span class="op-multi-active">Prenotazione unica · ${esc(booking.table_codes||'Tavoli combinati')}</span>`:''}</div>
    <button type="button" class="btn btn-dark" id="op-full-edit">Modifica prenotazione</button>
+   ${oasiVisitNext[booking.visit_state||'expected']?`<button type="button" class="btn btn-dark op-drawer-next" data-op-drawer-next="${oasiVisitNext[booking.visit_state||'expected'][0]}">${oasiVisitNext[booking.visit_state||'expected'][1]}</button>`:''}
    <label class="op-state-label">Stato servizio ${opSelect(booking)}</label>
    ${oasiWhatsAppHref(booking.phone,booking.name,state.date,booking.time)?`<a class="mini customer-wa" target="_blank" rel="noopener noreferrer" href="${esc(oasiWhatsAppHref(booking.phone,booking.name,state.date,booking.time))}">Contatta su WhatsApp</a>`:''}<button type="button" class="mini" id="op-open-agenda">Apri in Prenotazioni</button>`:
   `<p class="op-drawer-help">${!table.enabled?'Questo tavolo è disattivato nella piantina standard.':blocking?'Tavolo non disponibile per questo servizio.':roomBlocked?'La sala o il servizio è bloccato.':'Questo tavolo è libero per il servizio selezionato.'}</p>
@@ -910,6 +911,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
   wrap.querySelector('#op-unblock-table')?.addEventListener('click',()=>execute(async()=>{await api('admin/blocks/'+blocking.id,'DELETE');msg('Tavolo nuovamente disponibile')}));
   wrap.querySelector('#op-open-agenda')?.addEventListener('click',()=>{close();state.adminView='reservations';state.reservationService=state.opsService;renderAdmin()});
   wrap.querySelector('[data-op-state]')?.addEventListener('change',e=>{const select=e.target;select.disabled=true;execute(async()=>{await api('admin/visits/'+booking.id,'PATCH',{state:select.value});msg('Stato aggiornato')})});
+  wrap.querySelector('[data-op-drawer-next]')?.addEventListener('click',e=>{const button=e.currentTarget;button.disabled=true;execute(async()=>{await api('admin/visits/'+booking.id,'PATCH',{state:button.dataset.opDrawerNext});msg('Stato aggiornato')}).finally(()=>{if(button.isConnected)button.disabled=false})});
   wrap.querySelector('input')?.focus();
  };
  document.querySelectorAll('[data-op-table]').forEach(el=>{el.addEventListener('click',()=>mapClick(el));el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();mapClick(el)}})});
