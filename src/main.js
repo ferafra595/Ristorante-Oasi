@@ -773,6 +773,20 @@ const oasiConnectedTableIds=(ids,links)=>{
  }
  return visited.size===allowed.size;
 };
+const oasiLinkedComponent=(start,availableIds,links)=>{
+ const allowed=new Set(availableIds.map(Number)),seen=new Set([Number(start)]);
+ let changed=true;
+ while(changed){
+  changed=false;
+  for(const l of links||[]){
+   const a=Number(l.table_a),b=Number(l.table_b);
+   if(!allowed.has(a)||!allowed.has(b))continue;
+   if(seen.has(a)&&!seen.has(b)){seen.add(b);changed=true}
+   else if(seen.has(b)&&!seen.has(a)){seen.add(a);changed=true}
+  }
+ }
+ return seen;
+};
 const oasiRecommendStaffTables=(tables,party,links=[])=>{
  if(!Number.isSafeInteger(party)||party<1||party>200)return [];
  const rooms=new Map();
@@ -980,7 +994,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
   const roomBlocked=!(d.rooms||[]).find(r=>Number(r.id)===Number(table.room_id))?.internal_enabled||(d.blocks||[]).some(b=>(b.scope==='room'&&Number(b.target_id)===Number(table.room_id))||b.scope==='service');
   const taken=new Set((d.reservations||[]).filter(r=>r.status==='confirmed'&&r.service===state.opsService).flatMap(r=>String(r.table_ids||'').split(',').map(Number)));
   const forbidden=new Set((d.blocks||[]).filter(b=>b.scope==='table').map(b=>Number(b.target_id)));
-  const additional=(d.tables||[]).filter(t=>Number(t.room_id)===Number(table.room_id)&&Number(t.id)!==id&&t.enabled&&!taken.has(Number(t.id))&&!forbidden.has(Number(t.id))&&oasiConnectedTableIds([id,Number(t.id)],d.links||[])).sort((a,b)=>String(a.code).localeCompare(String(b.code),'it',{numeric:true}));
+  const freeSameRoom=(d.tables||[]).filter(t=>Number(t.room_id)===Number(table.room_id)&&t.enabled&&!taken.has(Number(t.id))&&!forbidden.has(Number(t.id)));const component=oasiLinkedComponent(id,[id,...freeSameRoom.map(t=>Number(t.id))],d.links||[]);const additional=freeSameRoom.filter(t=>Number(t.id)!==id&&component.has(Number(t.id))).sort((a,b)=>String(a.code).localeCompare(String(b.code),'it',{numeric:true}));
   const bookIds=booking?String(booking.table_ids||'').split(',').map(Number).filter(Boolean):[];
   document.querySelector('.op-drawer-layer')?.remove();
   const wrap=document.createElement('div');wrap.className='op-drawer-layer';
@@ -990,7 +1004,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
    <label class="op-state-label">Stato servizio ${opSelect(booking)}</label>
    ${oasiWhatsAppHref(booking.phone,booking.name,state.date,booking.time)?`<a class="mini customer-wa" target="_blank" rel="noopener noreferrer" href="${esc(oasiWhatsAppHref(booking.phone,booking.name,state.date,booking.time))}">Contatta su WhatsApp</a>`:''}<button type="button" class="mini" id="op-open-agenda">Apri in Prenotazioni</button>`:
   `<p class="op-drawer-help">${!table.enabled?'Questo tavolo è disattivato nella piantina standard.':blocking?'Tavolo non disponibile per questo servizio.':roomBlocked?'La sala o il servizio è bloccato.':'Questo tavolo è libero per il servizio selezionato.'}</p>
-   ${table.enabled&&!blocking&&!roomBlocked?`<form id="op-new-reservation" class="op-drawer-form"><label>Cliente<input name="name" maxlength="120" required placeholder="Nome e cognome"></label><label>Telefono<input name="phone" type="tel" required placeholder="Numero di telefono"></label><label>Ora di arrivo<input type="time" name="time" value="${state.opsService==='lunch'?'12:30':'19:30'}" required></label><label>Persone<input name="party_size" type="number" min="1" max="200" value="${Math.min(Number(table.seats),Math.max(2,Number(table.min_seats||1)))}" required></label><div class="op-multi-group"><div class="op-multi-heading"><strong>Tavoli della prenotazione</strong><small>Puoi unire solo i tavoli adiacenti collegati nella piantina</small></div><label class="op-multi-option"><input type="checkbox" data-combine-table="${id}" checked disabled><span><strong>Tavolo ${esc(table.code)}</strong><small>${Number(table.min_seats||1)}–${Number(table.seats)} posti · selezionato</small></span></label>${additional.map(t=>`<label class="op-multi-option"><input type="checkbox" data-combine-table="${Number(t.id)}"><span><strong>Tavolo ${esc(t.code)}</strong><small>${Number(t.min_seats||1)}–${Number(t.seats)} posti</small></span></label>`).join('')}<div class="op-multi-capacity" id="op-multi-capacity" role="status" aria-live="polite"></div><p class="op-multi-hint">L’unione vale soltanto per questa prenotazione: la piantina standard non cambia. Tutti i tavoli restano riservati fino alla fine del servizio.</p></div><label>Email obbligatoria<input type="email" name="email" required></label><label>Note<textarea name="notes" rows="3"></textarea></label><p class="op-drawer-help">Prenotazione unica sul tavolo o sui tavoli selezionati. I gruppi da 10 persone in su possono essere inseriti solo dal personale.</p><button type="submit" class="btn btn-dark">Conferma prenotazione</button></form>`:''}
+   ${table.enabled&&!blocking&&!roomBlocked?`<form id="op-new-reservation" class="op-drawer-form"><label>Cliente<input name="name" maxlength="120" required placeholder="Nome e cognome"></label><label>Telefono<input name="phone" type="tel" required placeholder="Numero di telefono"></label><label>Ora di arrivo<input type="time" name="time" value="${state.opsService==='lunch'?'12:30':'19:30'}" required></label><label>Persone<input name="party_size" type="number" min="1" max="200" value="${Math.min(Number(table.seats),Math.max(2,Number(table.min_seats||1)))}" required></label><div class="op-multi-group"><div class="op-multi-heading"><strong>Tavoli della prenotazione</strong><small>Puoi aggiungere solo tavoli adiacenti a quelli già selezionati</small></div><label class="op-multi-option"><input type="checkbox" data-combine-table="${id}" checked disabled><span><strong>Tavolo ${esc(table.code)}</strong><small>${Number(table.min_seats||1)}–${Number(table.seats)} posti · selezionato</small></span></label>${additional.map(t=>`<label class="op-multi-option"><input type="checkbox" data-combine-table="${Number(t.id)}"><span><strong>Tavolo ${esc(t.code)}</strong><small>${Number(t.min_seats||1)}–${Number(t.seats)} posti</small></span></label>`).join('')}<div class="op-multi-capacity" id="op-multi-capacity" role="status" aria-live="polite"></div><p class="op-multi-hint">L’unione vale soltanto per questa prenotazione: la piantina standard non cambia. Tutti i tavoli restano riservati fino alla fine del servizio.</p></div><label>Email obbligatoria<input type="email" name="email" required></label><label>Note<textarea name="notes" rows="3"></textarea></label><p class="op-drawer-help">Prenotazione unica sul tavolo o sui tavoli selezionati. I gruppi da 10 persone in su possono essere inseriti solo dal personale.</p><button type="submit" class="btn btn-dark">Conferma prenotazione</button></form>`:''}
    ${blocking?'<button type="button" class="btn btn-outline" id="op-unblock-table">Rendi disponibile</button>':!booking&&!roomBlocked&&table.enabled?'<button type="button" class="btn btn-outline" id="op-block-table">Imposta non disponibile</button>':''}`;
   wrap.innerHTML=`<button type="button" class="op-drawer-scrim" aria-label="Chiudi pannello"></button><aside class="op-drawer" role="dialog" aria-modal="true" aria-label="Gestione tavolo ${esc(table.code)}"><div class="op-drawer-top"><div><span class="eyebrow">GESTIONE SERVIZIO</span><h2>Tavolo ${esc(table.code)}</h2><p>${Number(table.min_seats||1)}–${Number(table.seats)} posti · ${esc(opServiceLabel(state.opsService))} · ${esc(state.date)}</p></div><button type="button" class="op-drawer-close" aria-label="Chiudi">×</button></div>${details}</aside>`;
   document.body.append(wrap);document.body.classList.add('op-drawer-open');
@@ -1005,7 +1019,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
    const capacityNode=wrap.querySelector('#op-multi-capacity');
    const updateCapacity=()=>{
     const chosen=selectedTables();const min=chosen.reduce((n,t)=>n+Number(t.min_seats||1),0),max=chosen.reduce((n,t)=>n+Number(t.seats||0),0);
-    const count=Number(partyField.value);const connected=oasiConnectedTableIds(chosen.map(t=>Number(t.id)),d.links||[]);const valid=Number.isInteger(count)&&count>=min&&count<=max&&connected;
+    const chosenIds=chosen.map(t=>Number(t.id));for(const cb of creationForm.querySelectorAll('[data-combine-table]:not(:disabled)')){const candidate=Number(cb.dataset.combineTable);cb.disabled=!cb.checked&&!((d.links||[]).some(l=>(Number(l.table_a)===candidate&&chosenIds.includes(Number(l.table_b)))||(Number(l.table_b)===candidate&&chosenIds.includes(Number(l.table_a)))))||chosen.length>=8;};const count=Number(partyField.value);const connected=oasiConnectedTableIds(chosenIds,d.links||[]);const valid=Number.isInteger(count)&&count>=min&&count<=max&&connected;
     capacityNode.innerHTML=`<strong>${chosen.length} ${chosen.length===1?'tavolo':'tavoli'} · ${min}–${max} posti</strong><span>${!connected?'I tavoli selezionati non formano una combinazione collegata':valid?'Capienza compatibile':`Inserisci un numero di ospiti tra ${min} e ${max}`}</span>`;
     capacityNode.classList.toggle('invalid',!valid);creationForm.querySelector('[type="submit"]').disabled=!valid||chosen.length>8;
     return {chosen,min,max,valid};
