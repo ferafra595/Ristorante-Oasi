@@ -10,7 +10,7 @@ const t=(x,y,w=55,h=110)=>({x,y,w,h});
 test('La sala propone tavoli vicini e non altri lontani',()=>{
  assert.equal(near(t(760,130),t(760,310)),true);
  assert.equal(near(t(760,130),t(100,310)),false);
- assert.equal(near(t(760,130),t(865,130)),true);
+ assert.equal(near(t(760,130),t(865,130)),false);
  assert.equal(near(t(760,130),t(200,200)),false);
 });
 test('Il pannello Sala consente di salvare i collegamenti direttamente',()=>{
@@ -46,4 +46,13 @@ test('La scelta guidata può proporre più tavoli senza confermare in automatico
  assert.ok(src.includes('oasiRecommendStaffTables([table,...additional],party,d.links||[])'));
  assert.ok(src.includes('updateCapacity();'));
  assert.ok(src.includes("await api('admin/reservations','POST',payload)"));
+});
+
+test('Allineamento verticale: 4+2 e 3+5+6 sono permessi; 5+4 laterale no',()=>{
+ const row4=t(660,110,55,120),row2=t(660,250,55,120);
+ const row3=t(530,110,55,55),row5=t(530,185,55,85),row6=t(530,298,55,90);
+ assert.equal(near(row4,row2),true);
+ assert.equal(near(row3,row5),true);
+ assert.equal(near(row5,row6),true);
+ assert.equal(near(row4,row5),false);
 });
