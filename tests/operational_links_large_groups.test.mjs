@@ -33,3 +33,17 @@ test('Candidati automatici possono combinare fino a otto tavoli',()=>{
  assert.ok(api.includes('if(group.length>=8)continue'));
  assert.ok(api.includes('if(ids.length<8)queue.push(ids)'));
 });
+
+test('La prenotazione in Sala aggiorna i collegamenti dal server, senza usare la lista iniziale',()=>{
+ assert.ok(src.includes('const reloadLinkedTables=async()=>'));
+ assert.ok(src.includes("await api('admin/operations?'"));
+ assert.ok(src.includes('additional=oasiLinkedOptions(d)'));
+ assert.ok(src.includes('id="oasi-linked-table-choices"'));
+ assert.ok(src.includes('id="oasi-reload-linked-tables"'));
+});
+test('La scelta guidata può proporre più tavoli senza confermare in automatico',()=>{
+ assert.ok(src.includes('id="oasi-pick-joined-tables"'));
+ assert.ok(src.includes('oasiRecommendStaffTables([table,...additional],party,d.links||[])'));
+ assert.ok(src.includes('updateCapacity();'));
+ assert.ok(src.includes("await api('admin/reservations','POST',payload)"));
+});
