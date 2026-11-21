@@ -1496,3 +1496,12 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .admin .oasi-mobile-nav button{touch-action:manipulation;min-width:0}
 }
 @media(prefers-reduced-motion:reduce){.oasi-public *, .oasi-public *::before,.oasi-public *::after,.admin *, .admin *::before,.admin *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+
+/* Quick booking: minimal table suggestion surface, matching ADMIN premium language */
+.admin .oasi-quick-suggestion{display:grid;gap:12px;padding:18px;border:1px solid #e2d3bd;background:#faf7f1;border-radius:18px;min-width:0}
+.admin .oasi-quick-suggestion h3{margin:0;font-family:'Playfair Display',serif;font-weight:400;font-size:clamp(21px,2vw,27px);line-height:1.2}
+.admin .oasi-quick-suggestion label{display:grid;gap:7px;min-width:0;font-weight:600;font-size:13px}
+.admin .oasi-quick-suggestion select{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;background:#fff;border:1px solid #d7cab8;border-radius:12px;min-height:50px;padding:10px 13px;color:#332b23;font-size:16px}
+.admin .oasi-quick-suggestion #oasi-suggestion-hint{font-size:13px;line-height:1.55;color:#736957;margin:0;overflow-wrap:anywhere}
+@media(max-width:700px){.admin .oasi-quick-suggestion{padding:14px;gap:10px;border-radius:15px}.admin .oasi-quick-suggestion select{font-size:16px;min-height:52px}}
