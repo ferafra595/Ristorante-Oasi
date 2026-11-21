@@ -807,7 +807,7 @@ const oasiRecommendStaffTables=(tables,party,links=[])=>{
   const id=Number(t.id),room=Number(t.room_id),min=Number(t.min_seats||1),max=Number(t.seats);
   if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(room)||!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min||min>party)continue;
   if(!rooms.has(room))rooms.set(room,[]);
-  rooms.get(room).push({id,min,max});
+  rooms.get(room).push({id,min,max,x:t.x,y:t.y,w:t.w,h:t.h});
  }
  let best=null,bestScore=null;
  for(const [room,arr] of rooms){
