@@ -1815,3 +1815,35 @@ body.oasi-public .oasi-gallery-lightbox-caption p{font-size:14px;margin:5px 0}
 body.oasi-public .oasi-gallery-counter{font-variant-numeric:tabular-nums;color:#f2dac0;font-size:13px;white-space:nowrap}
 body.oasi-public .gallery-lightbox button:focus-visible{outline:3px solid #ffe3b4;outline-offset:3px}
 @media(max-width:650px){body.oasi-public .gallery-lightbox:not([hidden]){padding:65px 12px 25px}body.oasi-public .gallery-lightbox img{max-width:96vw;max-height:73dvh}body.oasi-public .oasi-gallery-arrow{top:auto;bottom:67px;transform:none;width:41px;height:43px;font-size:30px}body.oasi-public .oasi-gallery-prev{left:15px}body.oasi-public .oasi-gallery-next{right:15px}body.oasi-public .oasi-gallery-lightbox-caption{padding:0 48px;min-height:34px;text-align:center}}
+
+
+/* Oasi mobile: header sempre raggiungibile durante lo scroll.
+   Il menu è ancorato alla viewport, non al punto iniziale del documento. */
+@media screen and (max-width:1000px){
+ body.oasi-public{padding-top:68px}
+ body.oasi-public .nav.nav-premium{
+  position:fixed!important;
+  top:0!important;left:0!important;right:0!important;
+  width:100%!important;max-width:100%!important;
+  box-sizing:border-box!important;
+  height:68px!important;
+  z-index:3000!important;
+  transform:none!important;
+  overflow:visible!important;
+ }
+ body.oasi-public .nav #links.open:not([hidden]){
+  position:absolute!important;
+  top:68px!important;left:0!important;right:0!important;bottom:auto!important;
+  inset:68px 0 auto!important;
+  width:100%!important;
+  height:calc(100dvh - 68px)!important;
+  max-height:calc(100dvh - 68px)!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  z-index:3001!important;
+  box-sizing:border-box!important;
+ }
+ body.oasi-public .nav .hamburger{position:relative;z-index:3002}
+ body.oasi-public.oasi-nav-open .oasi-mobile-book{display:none!important}
+}
