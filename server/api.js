@@ -329,6 +329,29 @@ if(resource==='menu-pdf'){
  }
  return fail('Metodo non consentito',405);
 }
+if(resource==='readiness'&&method==='GET'){
+ const [migration,tables,rooms,counts,emails]=await Promise.all([
+  phase7Ready(db),
+  db.prepare('SELECT COUNT(*) n FROM tables WHERE enabled=1').first(),
+  db.prepare('SELECT COUNT(*) n FROM rooms WHERE internal_enabled=1').first(),
+  db.prepare("SELECT COUNT(*) n FROM reservations WHERE status='confirmed'").first(),
+  db.prepare("SELECT status,COUNT(*) n FROM oasi_email_log GROUP BY status").all().catch(()=>({results:[]}))
+ ]);
+ const failed=(emails.results||[]).filter(x=>['failed','unconfigured'].includes(x.status)).reduce((n,x)=>n+Number(x.n||0),0);
+ return json({
+  database_ready:migration,
+  admin_password_configured:!!ctx.env.ADMIN_PASSWORD,
+  media_bucket_configured:!!ctx.env.MEDIA,
+  email_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM),
+  notify_email_configured:!!ctx.env.ADMIN_NOTIFY_EMAIL,
+  tables_enabled:Number(tables?.n||0),
+  rooms_enabled:Number(rooms?.n||0),
+  confirmed_bookings:Number(counts?.n||0),
+  email_failed_or_unconfigured:failed,
+  scheduled_reminders:'Verificare su Cloudflare che il deployment abbia applicato i Cron Triggers e che il primo promemoria risulti inviato',
+  backup:'Da effettuare e verificare su Cloudflare D1 prima della consegna'
+ });
+}
 if(resource==='security')return securityRoute(ctx,parts,method,b,user);
 if(resource==='events')return eventsAdmin(ctx,parts,method,b);
 if(resource==='me')return json({user});
