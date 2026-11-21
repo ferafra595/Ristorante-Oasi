@@ -1,62 +1,52 @@
-# Ristorante Oasi — sito e gestionale prenotazioni
+# Ristorante Oasi — Sito e gestionale prenotazioni
 
-Pacchetto sorgente 1.0 per **Cloudflare Workers + Static Assets + D1 + R2**. Frontend vanilla JavaScript responsive, senza librerie frontend. Logo ufficiale incluso. Nome/immagini di esempio presenti solo finché non inserisci le foto reali.
+Progetto in produzione su **Cloudflare Workers, D1 e R2** (JavaScript senza framework frontend). Include il sito pubblico, il pannello amministrativo e i sistemi di prenotazione e gestione delle sale.
 
-## Funzioni incluse
-- Sito: Home, Chi siamo modificabile, Menù (piatti/pizze/vini), Galleria, Contatti, Prenota e privacy provvisoria.
-- Prenotazioni web: date, fasce di arrivo libere in configurazione pranzo/cena, massimo 9, chiusura lunedì, sala piano terra pubblica, giardino pubblicabile dall'ADMIN, assegnazione del tavolo libero più piccolo adatto, occupazione per intero servizio, link di cancellazione.
-- ADMIN: accesso con password PBKDF2 e cookie HttpOnly; dashboard, prenotazioni telefoniche, cancellazione e spostamento tavoli, gestione sale e tavoli, editor piantina drag-and-drop, menù, foto (R2), testi e impostazioni orari.
-- D1 blocca con vincolo UNIQUE lo stesso tavolo/data/servizio anche in caso di richieste contemporanee. Niente doppia assegnazione dello stesso tavolo.
+## Documentazione aggiornata
+- [CONSEGNA_OASI.md](CONSEGNA_OASI.md): guida ufficiale di pubblicazione, credenziali, email, backup e collaudo prima della consegna.
+- [COLLAUDO_OPERATIVO_FASI_1_2.md](COLLAUDO_OPERATIVO_FASI_1_2.md): matrice di test per prenotazioni, banchetti, blocchi, sala, agenda e stampa.
 
-## Prerequisiti
-Account Cloudflare con accesso a D1, Workers e R2; Node.js >= 20; npm; Wrangler; dominio facoltativo. **Non è una pubblicazione pronta per accettare clienti senza configurazione e collaudi**.
+**Attenzione:** il vecchio endpoint `/api/setup` è intenzionalmente disabilitato. L'ADMIN usa `ADMIN_PASSWORD` come Secret Cloudflare e accesso con password; non è necessario creare un account tramite richieste API.
 
-## Installazione
-1. Estrai la ZIP, apri il terminale nella cartella ed esegui `npm install`.
-2. `npx wrangler login`.
-3. `npx wrangler d1 create oasi-db` e sostituisci `INSERISCI_ID_DATABASE_D1` nel file `wrangler.toml` con l'ID ottenuto.
-4. `npx wrangler r2 bucket create oasi-media`.
-5. `npm run db:remote` per creare le tabelle in produzione. Per ambiente locale `npm run db:local`.
-6. Imposta un segreto lungo e casuale con `npx wrangler secret put SETUP_KEY`. Conserva il valore per il passaggio 8.
-7. `npm run deploy` e prendi nota dell'indirizzo Workers pubblicato. Configura `PUBLIC_URL` in `wrangler.toml` con l'URL HTTPS pubblicato e ridistribuisci. In locale esegui `cp .dev.vars.example .dev.vars`, assegna SETUP_KEY e usa `npm run dev`.
-8. Crea il primo ADMIN UNA SOLA VOLTA con una richiesta POST a `/api/setup`, ad esempio:
+## Sito pubblico
+Home, Chi siamo, Menù PDF, Galleria, Eventi e cerimonie, Contatti, FAQ e Prenota. Le prenotazioni online sono limitate a 9 persone, secondo disponibilità e configurazione del servizio. I tavoli vengono assegnati dal backend e sono impegnati per l'intero pranzo o cena.
 
-```bash
-curl -X POST 'https://TUO-SITO.workers.dev/api/setup' \
-  -H 'Content-Type: application/json' \
-  --data '{"setup_key":"LA_TUA_SETUP_KEY","email":"admin@tuodominio.it","password":"UNA_PASSWORD_DI_ALMENO_12_CARATTERI"}'
-```
+## Gestionale
+- Panoramica, Calendario, Agenda, Sala e piantina interattiva.
+- Gestione tavoli (capienza, forma e posizione), connessioni verticali e blocchi di tavoli/sale/servizio.
+- Prenotazioni staff per gruppi, ricerca clienti, modifica, cancellazione e stati di arrivo.
+- Banchetti con sala condivisa e più gruppi di tavoli, fino a 20 tavoli nello stesso evento.
+- Eventi e cerimonie con riserva esclusiva di una o più sale.
+- Stampa A4 della piantina, prenotazioni e riferimento P1/P2 per gruppi.
+- Anagrafiche clienti, statistiche, notifiche, registro email, sicurezza e registro operazioni.
+- Gestione galleria R2, testi, impostazioni, FAQ e Menù PDF.
 
-9. Apri `/admin` e accedi. Crea prima i tavoli nella sala piano terra: **senza tavoli attivi le prenotazioni online non potranno essere confermate**.
-10. Facoltativo: abilita email con `npx wrangler secret put RESEND_API_KEY` e configura la variabile `EMAIL_FROM` in Wrangler (mittente verificato su Resend). Senza servizio email, il link per annullare appare solo sullo schermo del cliente: serve quindi un canale di invio conferme prima di andare online. **WhatsApp non è integrato**.
+## Dati e disponibilità
+D1 gestisce l'unicità di tavolo/data/servizio per impedire doppie assegnazioni; le verifiche avvengono sul server. I tavoli collegabili non vengono occupati automaticamente: sono riservati soltanto quelli esplicitamente assegnati a una prenotazione.
 
-## Piantine, sale e tavoli
-La sala piano terra è visibile online. Il primo piano e la veranda restano gestiti internamente; il giardino può essere attivato online dal modulo Sale. Nell'editor scegli la sala, aggiungi tavoli, trascinali sullo schema e clicca un tavolo per modificare forma, posti, dimensioni, rotazione, gruppo di unione e stato. Tavoli che condividono un `group_code` nella stessa sala possono essere considerati un gruppo: il sistema li combina **tutti**, non in sottogruppi arbitrari.
+## Promemoria
+Il Worker definisce un handler `scheduled()` per i promemoria del giorno successivo alle 17:00 italiane. Nel file `wrangler.toml` è presente il trigger `0 15,16 * * *` per il cambio ora legale/solare. **La sola presenza nel repository non significa che il trigger sia già attivo sul Worker pubblicato.** Verificare nel pannello Cloudflare dopo il deployment.
 
-## Regole importanti
-- Tavolo occupato per tutto il servizio. Gli orari di arrivo liberi sono configurabili da ADMIN entro gli intervalli. Pranzo e cena sono indipendenti.
-- Chiusura straordinaria: impostare le date nel modulo Orari e regole. Chiusura singola sala per data non ha ancora un editor grafico (la struttura di configurazione API supporta `disabledDatesByRoom`).
-- La prenotazione viene assegnata automaticamente; in ADMIN il tasto Sposta richiede gli ID dei tavoli (visibili in editor / tramite API). Miglioreremo questa UX con selezione grafica in una versione successiva.
-- Le prenotazioni già registrate non vengono annullate quando si disattiva una sala: occorre spostarle manualmente se necessario.
-- Non disabilitare manualmente i tavoli con prenotazioni non ricollocate.
-
-## Da completare prima della produzione
-**Obbligatorio:** dati reali e foto del ristorante, piantina e capienze effettive, privacy policy GDPR personalizzata da un professionista, dominio/mittente email e verifica invio, test delle prenotazioni/cancellazioni/email da più dispositivi, trattamento del caso pioggia, politica di cancellazione e backup D1. Valutare un controllo anti-abuso/rate limit per POST prenotazioni e accesso admin, protezione Turnstile e gestione dei log.
-
-**Limiti della release:** editor dei muri/porte non presente; piantina gestisce tavoli su canvas a griglia. Configurazione riaperture straordinarie non prevista nell'interfaccia. Spostamento tavolo ADMIN usa ID. Statisticamente sono disponibili prenotazioni e coperti (non incassi), senza esportazione. Email senza resend non viene inviata. Le foto demo provengono da URL esterni e vanno sostituite.
+Le email richiedono `RESEND_API_KEY` come Secret e `EMAIL_FROM` come mittente verificato; senza configurazione, la prenotazione può essere salvata ma la consegna email non è garantita.
 
 ## Comandi
-- `npm run build`: compila frontend **senza dipendenze esterne** usando Node.
-- `npm run dev`: build e avvio locale Workers con Wrangler.
-- `npm run deploy`: build e pubblicazione Workers.
-- `npm run db:local` / `npm run db:remote`: applica migrazioni D1.
+```bash
+npm run build
+npm run dev
+npm run deploy
+npm run db:local
+npm run db:remote
+```
+Per un backup SQL D1 remoto:
+```bash
+npx wrangler d1 export oasi-db --remote --output=./oasi-backup.sql
+```
+Eseguire l'export in uno spazio privato; il backup contiene dati personali. Il restore va provato prima su un database separato.
 
-## Struttura semplificata
-- `src/`: interfaccia pubblica, pannello ADMIN, CSS e logo
-- `server/`: API, database e ingresso Cloudflare Worker
-- `migrations/`: schema database D1
-- `index.html`, `build.mjs`, `package.json`, `wrangler.toml`: configurazione e compilazione
+## Prima della consegna
+**Non dichiarare pronto il ristorante soltanto perché GitHub Actions è verde.** Servono il test sul sito Cloudflare con prenotazioni e banchetti, prova email reale, stampa A4, prova mobile, verifica del dominio e dei Cron Trigger, backup D1 con recuperabilità verificata e informativa privacy definitiva.
 
-La cartella `dist/` si crea automaticamente con `npm run build` e non va caricata nel repository. Pubblicazione con **Cloudflare Workers**, non con il solo hosting statico Pages.
+La procedura completa si trova in [CONSEGNA_OASI.md](CONSEGNA_OASI.md).
 
-Non pubblicare mai `.dev.vars` o altre chiavi segrete.
+## Sicurezza
+Non pubblicare mai file `.dev.vars`, credenziali, file SQL di backup o esportazioni clienti nel repository. L'accesso ADMIN è singolo: la separazione dei permessi per diversi dipendenti non è presente in questa versione.
