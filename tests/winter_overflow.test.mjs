@@ -105,3 +105,42 @@ test('ADMIN: modifica prenotazione al primo piano senza obbligare a scegliere un
  assert.equal(updated.room_id,2);assert.equal(updated.party_size,5);
  assert.equal(t.db.sql.prepare('SELECT COUNT(*) n FROM reservation_tables WHERE reservation_id=?').get(row.id).n,0);
 });
+
+test('Verifica disponibilità: orario dopo ultima cena restituisce 400 con messaggio specifico',async()=>{
+ const t=setup();
+ const r=await t.request('availability?date='+date+'&service=dinner&time=23:01&party_size=2');
+ assert.equal(r.status,400,JSON.stringify(r.body));
+ assert.match(r.body.error,/Ultimo orario prenotabile.*cena.*23:00/);
+ assert.doesNotMatch(r.body.error,/server|Cloudflare|database/i);
+});
+test('Le ore 23:00 rimangono consentite se impostate come ultimo arrivo',async()=>{
+ const t=setup();
+ const r=await t.request('availability?date='+date+'&service=dinner&time=23:00&party_size=2');
+ assert.equal(r.status,200,JSON.stringify(r.body));
+ assert.equal(r.body.available,true);
+});
+test('Un orario prima dell’apertura informa il cliente quando può prenotare',async()=>{
+ const t=setup();
+ const r=await t.request('availability?date='+date+'&service=dinner&time=18:30&party_size=2');
+ assert.equal(r.status,400);
+ assert.match(r.body.error,/19:30/);
+});
+test('Giorno chiuso e date passate non producono errore 500',async()=>{
+ const t=setup();
+ t.db.sql.exec("UPDATE settings SET value=json_set(value,'$.closedDates',json('[\"2099-12-05\"]')) WHERE key='booking'");
+ const closed=await t.available();
+ assert.equal(closed.status,400);
+ assert.match(closed.body.error,/ristorante è chiuso/i);
+ const past=await t.request('availability?date=2020-01-01&service=dinner&time=20:00&party_size=2');
+ assert.equal(past.status,400);
+ assert.match(past.body.error,/già trascorsa/i);
+});
+test('Gruppi oltre limite e formato data errato producono avvisi comprensibili',async()=>{
+ const t=setup();
+ const large=await t.request('availability?date='+date+'&service=dinner&time=20:00&party_size=12');
+ assert.equal(large.status,400);
+ assert.match(large.body.error,/gruppi di 10 o più/i);
+ const invalid=await t.request('availability?date=non-valida&service=dinner&time=20:00&party_size=2');
+ assert.equal(invalid.status,400);
+ assert.match(invalid.body.error,/data valida/i);
+});
