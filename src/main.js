@@ -879,7 +879,11 @@ const oasiRecommendBanquetTables=(tables,party,links=[])=>{
       const connectedA=adjacent(a)?1:0,connectedB=adjacent(b)?1:0;
       const capacityA=Number(a.seats),capacityB=Number(b.seats);
       const surplusA=Math.max(0,max+capacityA-party),surplusB=Math.max(0,max+capacityB-party);
-      return (connectedB-connectedA)*100+(surplusA-surplusB)*2+(capacityB-capacityA);
+      const finishA=max+capacityA>=party,finishB=max+capacityB>=party;
+      if(finishA!==finishB)return finishA?-1:1;
+      if(finishA&&surplusA!==surplusB)return surplusA-surplusB;
+      if(!finishA&&capacityA!==capacityB)return capacityB-capacityA;
+      return connectedB-connectedA||Number(a.id)-Number(b.id);
      });
      const chosen=choices[0];picked.push(chosen);remaining.splice(remaining.indexOf(chosen),1);
      min+=Number(chosen.min_seats||1);max+=Number(chosen.seats);
