@@ -1802,3 +1802,16 @@ body.oasi-public .oasi-event-request-link:hover{text-decoration:none;color:#322c
  body.oasi-public .oasi-public-price{font-size:15px}
 }
 @media(prefers-reduced-motion:reduce){body.oasi-public .oasi-public-quicklinks>a{transition:none}}
+
+
+/* Oasi – Galleria accessibile e navigabile anche da smartphone */
+body.oasi-public .gallery-lightbox:not([hidden]){display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:55px 65px 30px;box-sizing:border-box}
+body.oasi-public .gallery-lightbox img{display:block;max-width:min(1100px,90vw);max-height:72dvh;width:auto;height:auto;object-fit:contain;flex:0 1 auto}
+body.oasi-public .oasi-gallery-arrow{position:absolute;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:46px;height:54px;border:1px solid #ffffff75;background:#181a18aa;color:#fff;border-radius:12px;cursor:pointer;font-size:36px;line-height:1}
+body.oasi-public .oasi-gallery-prev{left:15px}
+body.oasi-public .oasi-gallery-next{right:15px}
+body.oasi-public .oasi-gallery-lightbox-caption{display:flex;align-items:center;justify-content:center;gap:25px;max-width:min(1100px,90vw);color:#fff}
+body.oasi-public .oasi-gallery-lightbox-caption p{font-size:14px;margin:5px 0}
+body.oasi-public .oasi-gallery-counter{font-variant-numeric:tabular-nums;color:#f2dac0;font-size:13px;white-space:nowrap}
+body.oasi-public .gallery-lightbox button:focus-visible{outline:3px solid #ffe3b4;outline-offset:3px}
+@media(max-width:650px){body.oasi-public .gallery-lightbox:not([hidden]){padding:65px 12px 25px}body.oasi-public .gallery-lightbox img{max-width:96vw;max-height:73dvh}body.oasi-public .oasi-gallery-arrow{top:auto;bottom:67px;transform:none;width:41px;height:43px;font-size:30px}body.oasi-public .oasi-gallery-prev{left:15px}body.oasi-public .oasi-gallery-next{right:15px}body.oasi-public .oasi-gallery-lightbox-caption{padding:0 48px;min-height:34px;text-align:center}}
