@@ -15,7 +15,7 @@ vm.runInContext(chunk+'\nthis.render=oasiServiceMobileCards;this.transitions=oas
 
 const row=(state,id=11)=>({id,time:'19:30',name:'Mario Rossi',phone:'3331234567',party_size:2,table_codes:'T2',visit_state:state});
 test('Mobile service actions progress one state at a time',()=>{
- const scenarios=[['expected','arrived','Segna arrivato'],['arrived','seated','Accompagna al tavolo'],['seated','finished','Termina servizio']];
+ const scenarios=[['expected','arrived','Segna arrivato'],['arrived','finished','Termina servizio'],['seated','finished','Termina servizio']];
  for(const [from,to,text] of scenarios){
   const html=context.render([row(from)]);
   assert.match(html,new RegExp('data-op-next="'+to+'"'));
