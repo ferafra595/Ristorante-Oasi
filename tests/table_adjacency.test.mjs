@@ -24,8 +24,8 @@ test('La verifica è indipendente dal verso dei collegamenti',()=>{
  assert.equal(connected([1,2,3],[edge(3,2),edge(2,1)]),true);
 });
 test('Il server controlla collegamenti nella creazione, modifica e riassegnazione',()=>{
- assert.ok(server.includes('if(!(await oasiLinkedTables(db,ids)))return null;'));
- assert.ok(server.includes("if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti devono essere collegati in verticale"));
+ assert.ok(server.includes('if(!banquet&&!(await oasiLinkedTables(db,ids)))return null;'));
+ assert.ok(server.includes("if(!banquet&&!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti devono essere collegati in verticale"));
  assert.ok(server.includes('const candidate=await manualTableCandidate('));
  assert.ok(frontend.includes('oasiConnectedTableIds(selectedTables,tableLinks)'));
 });
