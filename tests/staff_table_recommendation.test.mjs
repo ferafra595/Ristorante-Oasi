@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
-const begin=source.indexOf('const oasiRecommendStaffTables=');
+const begin=source.indexOf('const oasiNearbyTable=');
 const end=source.indexOf('function openEditBookingDrawer',begin);
 assert.ok(begin>=0&&end>begin,'Algoritmo suggerimento mancante');
 const recommend=new Function(source.slice(begin,end)+'return oasiRecommendStaffTables;')();
-const t=(id,room,seats,min=1)=>({id,room_id:room,seats,min_seats:min});
+const t=(id,room,seats,min=1)=>({id,room_id:room,seats,min_seats:min,x:10,y:10+(id-1)*110,w:80,h:80});
 
 test('Consiglia tavolo singolo proporzionato senza sprecare posti',()=>{
  assert.deepEqual(recommend([t(1,1,2),t(2,1,3),t(3,1,6)],2),[1]);
