@@ -173,7 +173,7 @@ async function oasiLinkedTables(db,ids){
 // Does NOT modify the standard floor plan or allow public customers to bypass linked-table rules.
 async function manualTableCandidate(db,roomIds,date,service,party,selected,excludeId=0,banquet=false){
  
- if(!Array.isArray(selected)||selected.length<1||selected.length>8)return null;
+ if(!Array.isArray(selected)||selected.length<1||selected.length>(banquet?20:8))return null;
  const ids=selected.map(Number);
  if(ids.some(id=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)return null;
  const blocked=await serviceBlocks(db,date,service);
@@ -239,7 +239,7 @@ async function bookingUnavailableReason(db,roomIds,date,service,party,admin=fals
 async function manualTableUnavailableReason(db,roomIds,date,service,party,selected,excludeId=0,banquet=false){
  const when=`${serviceIt(service)} del ${dateIt(date)}`;
  const ids=selected.map(Number);
- if(ids.some(id=>!Number.isSafeInteger(id)||id<=0)||ids.length>8||new Set(ids).size!==ids.length)return 'Selezione tavoli non valida: scegli da 1 a 8 tavoli diversi.';
+ if(ids.some(id=>!Number.isSafeInteger(id)||id<=0)||ids.length>(banquet?20:8)||new Set(ids).size!==ids.length)return banquet?'Selezione tavoli non valida: scegli da 1 a 20 tavoli diversi per il banchetto.':'Selezione tavoli non valida: scegli da 1 a 8 tavoli diversi.';
  const marks=ids.map(()=>'?').join(',');
  const data=await db.prepare(`SELECT t.id,t.code,t.room_id,t.seats,t.enabled,COALESCE(d.min_seats,1) min_seats
  FROM tables t LEFT JOIN table_details d ON d.table_id=t.id WHERE t.id IN (${marks})`).bind(...ids).all();
