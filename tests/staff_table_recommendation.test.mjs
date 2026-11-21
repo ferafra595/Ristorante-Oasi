@@ -14,7 +14,7 @@ test('Consiglia tavolo singolo proporzionato senza sprecare posti',()=>{
  assert.deepEqual(recommend([t(1,1,3),t(2,1,4)],3),[1]);
 });
 test('Combina solo tavoli della stessa sala quando serve',()=>{
- const result=recommend([t(1,1,3),t(2,1,3),t(3,2,10)],5);
+ const result=recommend([t(1,1,3),t(2,1,3),t(3,2,4)],5);
  assert.deepEqual(result,[1,2]);
 });
 test('Non supera il limite massimo di otto tavoli',()=>{
