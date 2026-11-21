@@ -1,6 +1,20 @@
 import './style.css';
 const $=s=>document.querySelector(s),root=$('#app');
 const state={data:null,user:null,adminView:'dashboard',customerQuery:'',opsService:'lunch',opsManualSelection:false,agendaManualSelection:false,date:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'}),room:1,reservationService:'all',reservations:[],rooms:[],tables:[],tableLinks:[],roomZones:[],menu:[],gallery:[],settings:null};
+// Orario operativo locale: la sala passa alla cena alle 17:00 (Europe/Rome).
+const oasiItalianToday=(d=new Date())=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+const oasiItalianService=(d=new Date())=>{const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',hour:'2-digit',hourCycle:'h23'}).format(d));return hour>=17?'dinner':'lunch'};
+function oasiAutoServiceRefresh(){
+ if(state.adminView==='service'&&!state.opsManualSelection){
+  const today=oasiItalianToday(),service=oasiItalianService();
+  if(state.date!==today||state.opsService!==service){state.date=today;state.opsService=service;return true}
+ }
+ if(state.adminView==='reservations'&&!state.agendaManualSelection){
+  const today=oasiItalianToday();
+  if(state.date!==today||state.reservationService!=='all'){state.date=today;state.reservationService='all';return true}
+ }
+ return false;
+}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let oasiAdminWrites=0;
 const api=async(path,method='GET',data)=>{const writing=path.startsWith('admin/')&&!['GET','HEAD'].includes(method);if(writing)oasiAdminWrites++;try{let r;try{r=await fetch('/api/'+path,{method,headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,credentials:'same-origin',cache:'no-store'})}catch{throw Error('Impossibile contattare il server. Riprova tra poco.')}const type=r.headers.get('content-type')||'';const raw=await r.text();let o=null;try{o=JSON.parse(raw)}catch{}if(!o||typeof o!=='object'){console.error('API non JSON',{path,status:r.status,contentType:type,response:raw.slice(0,300)});throw Error('La richiesta API non arriva correttamente al backend (HTTP '+r.status+'). Verifica il deploy del Worker e i binding DB.')}if(!r.ok)throw Error(o.error||'Errore HTTP '+r.status);return o}finally{if(writing)oasiAdminWrites--}};
