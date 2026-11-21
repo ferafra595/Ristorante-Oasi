@@ -1543,3 +1543,63 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .admin .oasi-service-mobile-cards{margin:10px 0 22px}
  .admin .oasi-service-next:focus-visible,.admin .oasi-service-edit:focus-visible,.admin .oasi-service-call:focus-visible{outline:3px solid #ac8757;outline-offset:3px}
 }
+
+
+/* OASI – Agenda semplificata: pranzo/cena in primo piano */
+.admin .oasi-agenda-page{display:grid;gap:20px;min-width:0;max-width:100%}
+.admin .oasi-agenda-main-head{display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.admin .oasi-agenda-main-head .eyebrow{color:#a18159;letter-spacing:.18em;font-size:11px;font-weight:700}
+.admin .oasi-agenda-main-head h1{margin:5px 0 7px;font-size:clamp(42px,4vw,64px);line-height:1.12;font-family:'Playfair Display',Georgia,serif;font-weight:400;letter-spacing:-.035em;color:#2c261f}
+.admin .oasi-agenda-main-head p{margin:0;color:#827669;font-size:15px}
+.admin .oasi-agenda-main-head #new-book{min-height:48px;border-radius:100px;padding-inline:25px}
+.admin .oasi-agenda-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap;padding:14px;background:#fff;border:1px solid #e8ddcf;border-radius:18px;min-width:0}
+.admin .oasi-agenda-controls .mini{min-height:46px;border-radius:11px;padding:10px 15px}
+.admin .oasi-agenda-controls .oasi-agenda-date-label{display:grid;gap:4px;min-width:165px;font-size:12px;font-weight:700;color:#63594f;flex:0 1 195px}
+.admin .oasi-agenda-controls input[type=date]{box-sizing:border-box;min-width:0;width:100%;max-width:100%;min-height:46px;padding:8px 11px;border:1px solid #dfd2c3;border-radius:11px;background:#fff;color:#32291f;font-size:16px}
+.admin .oasi-agenda-filter,.admin .oasi-agenda-print{border:1px solid #e8ddcf;border-radius:14px;background:#fff;padding:0 16px;min-width:0}
+.admin .oasi-agenda-filter summary,.admin .oasi-agenda-print summary{cursor:pointer;padding:13px 0;color:#74695d;font-size:13px;font-weight:600;list-style:revert}
+.admin .oasi-agenda-filter label{display:grid;gap:7px;padding-bottom:15px;max-width:260px;font-size:13px;color:#716557}
+.admin .oasi-agenda-filter select{min-height:46px;border-radius:10px;padding:9px 12px;background:#fff;border:1px solid #dfd2c3;color:#302922;font-size:16px;box-sizing:border-box;max-width:100%}
+.admin .oasi-agenda-print>div{display:flex;flex-wrap:wrap;gap:10px;padding-bottom:15px}
+.admin .oasi-agenda-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start;min-width:0}
+.admin .oasi-agenda-group{min-width:0;background:#fff;border:1px solid #e7dac7;border-radius:23px;overflow:hidden;box-shadow:0 9px 30px rgba(57,43,30,.035)}
+.admin .oasi-agenda-group-heading{display:flex;gap:12px;align-items:end;justify-content:space-between;flex-wrap:wrap;padding:22px 23px 19px;border-bottom:1px solid #eee5da;background:#fbf8f3}
+.admin .oasi-agenda-group-heading .eyebrow{font-size:10px;letter-spacing:.14em;color:#a17d54;font-weight:700}
+.admin .oasi-agenda-group-heading h3{font-size:clamp(27px,2.6vw,38px);line-height:1.1;letter-spacing:-.025em;margin:4px 0 0;font-family:'Playfair Display',Georgia,serif;font-weight:400;color:#32271c}
+.admin .oasi-agenda-group-heading p{font-size:12px;color:#756a5c;margin:0}
+.admin .oasi-agenda-group-heading p strong{color:#2f271f}
+.admin .oasi-agenda-entries{display:grid;min-width:0}
+.admin .oasi-agenda-entry{display:grid;grid-template-columns:68px minmax(0,1fr);column-gap:14px;row-gap:8px;padding:18px 20px;border-bottom:1px solid #eee8e1;min-width:0}
+.admin .oasi-agenda-entry:last-child{border-bottom:0}
+.admin .oasi-agenda-entry.is-cancelled{opacity:.65}
+.admin .oasi-agenda-entry-time{display:flex;flex-direction:column;gap:8px;align-items:start}
+.admin .oasi-agenda-entry-time time{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;color:#3e3123}
+.admin .oasi-agenda-entry-source{font-size:10px;letter-spacing:.03em;color:#998675}
+.admin .oasi-agenda-entry-details{min-width:0}
+.admin .oasi-agenda-entry-details h4{margin:0 0 5px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;color:#30291f;overflow-wrap:anywhere}
+.admin .oasi-agenda-entry-details p{margin:0;font-size:13px;line-height:1.5;color:#756b5e;overflow-wrap:anywhere}
+.admin .oasi-agenda-entry-details .oasi-agenda-entry-note{margin-top:5px;font-size:12px;color:#8a806f}
+.admin .oasi-agenda-entry-side{grid-column:2;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;min-width:0}
+.admin .oasi-agenda-visit-status{font-size:11px;padding:6px 10px;border-radius:100px;background:#e8eee7;color:#426b48;font-weight:700}
+.admin .oasi-agenda-visit-status.is-cancelled{background:#f4e6e6;color:#974e4e}
+.admin .oasi-agenda-entry-actions{display:flex;flex-wrap:wrap;gap:6px}
+.admin .oasi-agenda-entry-actions .mini{font-size:12px;min-height:36px;border-radius:9px;padding:7px 11px}
+.admin .oasi-agenda-empty{padding:28px 23px;margin:0;color:#8c8173;font-size:14px}
+.admin .oasi-sala-auto-label{display:inline-block;color:#487355;font-size:11px;font-weight:700;padding:3px 7px;background:#e7f0e7;border-radius:99px;margin-left:5px}
+@media(max-width:1250px){.admin .oasi-agenda-groups{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){
+ .admin .oasi-agenda-page{gap:13px}
+ .admin .oasi-agenda-main-head{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+ .admin .oasi-agenda-main-head h1{font-size:clamp(38px,10vw,51px)}
+ .admin .oasi-agenda-main-head #new-book{width:100%;min-height:52px}
+ .admin .oasi-agenda-controls{display:grid;grid-template-columns:1fr minmax(0,1.45fr) 1fr;gap:8px;padding:11px;border-radius:15px}
+ .admin .oasi-agenda-controls .mini{padding:9px 7px;min-height:49px;font-size:12px;white-space:normal}
+ .admin .oasi-agenda-controls .oasi-agenda-date-label{min-width:0;max-width:100%;flex:none;font-size:11px}
+ .admin .oasi-agenda-controls #reservation-today{grid-column:1/-1;min-height:44px}
+ .admin .oasi-agenda-filter,.admin .oasi-agenda-print{padding:0 13px}
+ .admin .oasi-agenda-group{border-radius:18px}
+ .admin .oasi-agenda-group-heading{padding:18px 16px;align-items:center}
+ .admin .oasi-agenda-entry{grid-template-columns:59px minmax(0,1fr);gap:8px 10px;padding:16px 13px}
+ .admin .oasi-agenda-entry-side{grid-column:1/-1;padding-top:4px}
+ .admin .oasi-agenda-entry-actions .mini{min-height:44px}
+}
