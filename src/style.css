@@ -1680,3 +1680,12 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .oasi-agenda-head-actions>#new-book{grid-column:1/-1;width:100%}
 }
 @media print{.oasi-agenda-head-actions{display:none!important}}
+
+/* Oasi consegna: stato configurazione e controlli senza esporre credenziali */
+.oasi-readiness-panel{margin-top:18px}
+.oasi-readiness-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;margin:15px 0}
+.oasi-readiness-grid p{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;padding:12px 14px;border:1px solid #e4d9ca;border-radius:11px;background:#fff}
+.oasi-readiness-grid strong{font-size:12px;white-space:nowrap}
+.oasi-readiness-ok{color:#30603c}
+.oasi-readiness-warning{color:#99522d}
+@media(max-width:800px){.oasi-readiness-grid{grid-template-columns:1fr}}
