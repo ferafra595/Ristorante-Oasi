@@ -109,6 +109,33 @@ async function operationsData(db,date,service){
   .filter(s=>service==='all'||service===s).map(s=>({id:'event:'+x.event_id+':'+x.room_id+':'+s,scope:'room',target_id:x.room_id,service:s,reason:'Sala riservata per evento privato',event_id:x.event_id,source:'event'})));
  return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:[...(blocks.results||[]),...eventBlocks],zones:zones.results||[],links:links.results||[]};
 }
+
+/* Primo piano invernale senza piantina: capacità gestita a coperti, non a tavoli.
+   La sala resta public_enabled=0; il permesso di overflow è indipendente. */
+const oasiWinterOverflowAllowed=cfg=>
+ cfg?.seasonMode==='winter'&&cfg?.firstFloorOverflowEnabled===true
+ &&Number.isSafeInteger(Number(cfg?.firstFloorOverflowCapacity))
+ &&Number(cfg.firstFloorOverflowCapacity)>0&&Number(cfg.firstFloorOverflowCapacity)<=500;
+async function oasiOverflowCandidate(db,cfg,date,service,party){
+ if(!oasiWinterOverflowAllowed(cfg))return null;
+ if(!(await db.prepare('SELECT version FROM oasi_schema_versions WHERE version=12').first().catch(()=>null)))return null;
+ const room=await db.prepare('SELECT id,name,internal_enabled FROM rooms WHERE id=2').first();
+ if(!room||!Number(room.internal_enabled))return null;
+ // La piantina del primo piano non è necessaria; non assegniamo tavoli fittizi.
+ const blocks=await serviceBlocks(db,date,service);
+ if(blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===2)))return null;
+ const existing=await db.prepare("SELECT COALESCE(SUM(party_size),0) n FROM reservations WHERE room_id=2 AND book_date=? AND service=? AND status='confirmed'").bind(date,service).first();
+ const used=Number(existing?.n||0),cap=Number(cfg.firstFloorOverflowCapacity);
+ if(used+party>cap)return null;
+ return {ids:[],room_id:2,capacity:cap-used,code:'Senza tavolo · Primo piano',overflow:true};
+}
+async function oasiBookingCandidates(db,roomIds,date,service,party,cfg,onlyRoom=0){
+ const tables=await candidates(db,onlyRoom?roomIds.filter(id=>Number(id)===onlyRoom):roomIds.filter(id=>Number(id)!==2),date,service,party);
+ if(tables.length)return tables;
+ if(onlyRoom&&onlyRoom!==2)return [];
+ const overflow=await oasiOverflowCandidate(db,cfg,date,service,party);
+ return overflow?[overflow]:[];
+}
 async function candidates(db,roomIds,date,service,party){
  if(!roomIds.length)return [];
  
@@ -271,14 +298,14 @@ if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length){
  const explicit=await manualTableCandidate(db,usable,d,svc,party,requested,0,b.banquet_shared===true);
  if(!explicit)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,requested,0,b.banquet_shared===true));
  opts=[explicit]; // Never silently assign different tables when staff requested exact IDs.
-}else{if(admin&&b.banquet_shared===true)throw Error('Seleziona i tavoli riservati al banchetto.');opts=await candidates(db,usable,d,svc,party)}
+}else{if(admin&&b.banquet_shared===true)throw Error('Seleziona i tavoli riservati al banchetto.');opts=await oasiBookingCandidates(db,usable,d,svc,party,(await config(db,'booking')),admin&&b.room_id?Number(b.room_id):0)}
 if(!opts.length)throw Error(await bookingUnavailableReason(db,usable,d,svc,party,admin));const token=rand(),hashed=await digest(token);for(const o of opts.slice(0,8)){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?(b.banquet_shared===true?'staff_banquet':'staff'):'web',o.room_id,hashed);const seq=await db.batch([insert,db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) SELECT (SELECT id FROM reservations WHERE cancel_token_hash=?),value,?,? FROM json_each(?)').bind(hashed,d,svc,JSON.stringify(o.ids)),db.prepare('UPDATE reservations SET party_size=party_size WHERE cancel_token_hash=?').bind(hashed)]);const id=Number(seq[0].meta.last_row_id);const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;
 const booking={id,book_date:d,service:svc,time:tm,party_size:party,name,phone,email:mail,source:admin?(b.banquet_shared===true?'staff_banquet':'staff'):'web'};
 let mailResult={status:'unconfigured'};
 try{await syncCustomer(db,booking);await alertStaff(db,id,'new','Nuova prenotazione #'+id,`${d} ${svc==='lunch'?'Pranzo':'Cena'} · ${tm} · ${name} · ${party} persone`)}catch(e){console.error('Oasi fase2 post-book',e)}
 try{mailResult=await emailForBooking(ctx,booking,'confirm',cancellation);await emailStaff(ctx,booking,'new')}catch(e){console.error('Oasi email confirm',e)}
 return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_status:mailResult.status,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)};
-}catch(e){const detail=String(e);if(/oasi_(event_room_reserved|manual_block|table_disabled|room_disabled|capacity_invalid)|UNIQUE constraint failed/.test(detail)){if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,b.table_ids,0,b.banquet_shared===true));continue}console.error('Oasi booking transaction',e);throw Error('Non è stato possibile registrare la prenotazione. Aggiorna la disponibilità e riprova.')}}throw Error('Disponibilità appena esaurita: '+await bookingUnavailableReason(db,usable,d,svc,party,admin))}
+}catch(e){const detail=String(e);if(/oasi_(event_room_reserved|manual_block|table_disabled|room_disabled|capacity_invalid|overflow_capacity|overflow_closed)|UNIQUE constraint failed/.test(detail)){if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,b.table_ids,0,b.banquet_shared===true));continue}console.error('Oasi booking transaction',e);throw Error('Non è stato possibile registrare la prenotazione. Aggiorna la disponibilità e riprova.')}}throw Error('Disponibilità appena esaurita: '+await bookingUnavailableReason(db,usable,d,svc,party,admin))}
 async function phase7Ready(db){
  try{return !!(await db.prepare('SELECT version FROM oasi_schema_versions WHERE version=11').first())}catch{return false}
 }
@@ -694,7 +721,7 @@ if(parts[0]==='admin'){
  return response;
 }
 if(parts[0]==='public'&&method==='GET'){const [site,booking,rooms,menu,gallery]=await Promise.all([config(db,'site'),config(db,'booking'),db.prepare('SELECT id,name,public_enabled FROM rooms ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM menu_items WHERE available=1 ORDER BY sort_order,id').all(),db.prepare('SELECT * FROM gallery ORDER BY sort_order,id').all()]);const menuPdf=!!(await ctx.env.MEDIA?.head('restaurant-menu.pdf').catch(()=>null));return json({site,booking,rooms:rooms.results,menu:menu.results,gallery:gallery.results,menuPdf,email_enabled:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)})}
-if(parts[0]==='availability'&&method==='GET'){if(!(await phase7Ready(db)))return fail('Prenotazioni temporaneamente sospese per aggiornamento. Contatta il ristorante.',503);const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await candidates(db,state.ids,state.d,state.svc,state.party);return json({available:options.length>0,message:options.length?'':await bookingUnavailableReason(db,state.ids,state.d,state.svc,state.party,false),rooms:(await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1').all()).results.filter(r=>options.some(o=>o.room_id===r.id))})}
+if(parts[0]==='availability'&&method==='GET'){if(!(await phase7Ready(db)))return fail('Prenotazioni temporaneamente sospese per aggiornamento. Contatta il ristorante.',503);const p=Object.fromEntries(url.searchParams);const state=await validateBooking(db,{...p,name:'x',phone:'x',email:'x'},false);const options=await oasiBookingCandidates(db,state.ids,state.d,state.svc,state.party,state.cfg);const rooms=await db.prepare('SELECT id,name FROM rooms WHERE public_enabled=1 OR id=2 ORDER BY sort_order,id').all();return json({available:options.length>0,message:options.length?'':await bookingUnavailableReason(db,state.ids,state.d,state.svc,state.party,false),rooms:rooms.results.filter(r=>options.some(o=>o.room_id===r.id)),overflow:options.some(o=>o.overflow===true)})}
 if(parts[0]==='book'&&method==='POST'){if(!(await phase7Ready(db)))return fail('Prenotazioni temporaneamente sospese per aggiornamento. Contatta il ristorante.',503);try{return json(await saveBooking(ctx,await read(ctx.request),false),201)}catch(e){return fail(e.message||'Impossibile registrare la prenotazione',409)}}
 if(parts[0]==='cancel'&&method==='POST'){const b=await read(ctx.request);if(!/^[a-f0-9]{64}$/.test(b.token||''))return fail('Link non valido');const hashed=await digest(b.token),r=await db.prepare("SELECT r.id,r.status,COALESCE(v.state,'expected') visit_state FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id WHERE r.cancel_token_hash=?").bind(hashed).first();if(!r)return fail('Prenotazione non trovata',404);if(r.status==='cancelled')return json({ok:true,already:true});if(r.status!=='confirmed'||r.visit_state!=='expected')return fail('La prenotazione è già in gestione al ristorante. Chiama per richiedere modifiche.',409);const cancelled=await db.batch([db.prepare("UPDATE reservations SET status='cancelled' WHERE id=? AND status='confirmed' AND NOT EXISTS (SELECT 1 FROM service_visits WHERE reservation_id=? AND state<>'expected')").bind(r.id,r.id),db.prepare("DELETE FROM reservation_tables WHERE reservation_id=? AND EXISTS (SELECT 1 FROM reservations WHERE id=? AND status='cancelled')").bind(r.id,r.id)]);if(!cancelled[0].meta.changes)return fail('La prenotazione non è più annullabile online. Contatta il ristorante.',409);
  try{const old=await db.prepare('SELECT * FROM reservations WHERE id=?').bind(r.id).first();await alertStaff(db,r.id,'cancel','Prenotazione annullata #'+r.id,`${old.book_date} · ${old.name}`);await emailForBooking(ctx,old,'cancel');await emailStaff(ctx,old,'cancel')}catch(e){console.error('Oasi public cancel',e)}return json({ok:true})}
