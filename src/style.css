@@ -1667,3 +1667,16 @@ body.oasi-booking-drawer-open{overflow:hidden}
 #oasi-banquet-suggest{background:#e5eee4;color:#315d3c;border-color:#a8c1ab;font-weight:750}
 #oasi-banquet-capacity{border-radius:11px;background:#fff;border:1px solid #e2d6c3;padding:12px 13px;line-height:1.5;color:#443726}
 @media(max-width:640px){.oasi-banquet-actions{display:grid;grid-template-columns:1fr}.oasi-banquet-actions>.mini{width:100%;min-height:46px}}
+
+
+/* Oasi Fase 2 — azioni più usate sempre in evidenza in Agenda. */
+.oasi-agenda-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.oasi-agenda-head-actions>.mini{padding:12px 15px;min-height:43px;border:1px solid #cfc0aa;background:#fff;color:#524027;border-radius:10px;font-weight:700}
+.oasi-agenda-head-actions>#agenda-new-banquet{background:#f9f0df;border-color:#d6be96;color:#725229}
+.oasi-agenda-head-actions>.btn{min-height:45px}
+@media(max-width:760px){
+ .oasi-agenda-head-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .oasi-agenda-head-actions>.mini{font-size:12px;padding:10px 8px;min-width:0}
+ .oasi-agenda-head-actions>#new-book{grid-column:1/-1;width:100%}
+}
+@media print{.oasi-agenda-head-actions{display:none!important}}
