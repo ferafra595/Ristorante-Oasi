@@ -585,7 +585,7 @@ function printOasiReservations(mode='plan'){
   }
   return edges.join(' ');
  };
- const listTable=items=>`<table class="bookings"><thead><tr><th>Ora</th><th>Cliente</th><th>Persone</th><th>Tavolo</th><th>Telefono</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.time)}</td><td>${esc(r.name)}</td><td>${cleanNumber(r.party_size)}</td><td>${esc(r.table_codes||'Non assegnato')}</td><td>${esc(r.phone||'')}</td></tr>`).join('')||'<tr><td colspan="5">Nessuna prenotazione confermata</td></tr>'}</tbody></table>`;
+ const listTable=(items,withReferences=false)=>{const sorted=[...items].sort((a,b)=>String(a.time).localeCompare(String(b.time))||Number(a.id)-Number(b.id));return `<table class="bookings"><thead><tr>${withReferences?'<th>Rif.</th>':''}<th>Ora</th><th>Cliente</th><th>Persone</th><th>Tavoli</th><th>Telefono</th></tr></thead><tbody>${sorted.map((r,i)=>`<tr>${withReferences?`<td><span class="booking-ref">P${i+1}</span></td>`:''}<td>${esc(r.time)}</td><td><strong>${esc(r.name)}</strong></td><td class="bookings-party">${cleanNumber(r.party_size)}</td><td>${esc(r.table_codes||'Non assegnato')}</td><td>${esc(r.phone||'')}</td></tr>`).join('')||`<tr><td colspan="${withReferences?6:5}">Nessuna prenotazione confermata</td></tr>`}</tbody></table>`;};
  const svgRoom=(room,tables,zones,structures,items,links=[])=>{
   const roomTables=tables.filter(t=>Number(t.room_id)===Number(room.id)&&t.enabled!==0);
   const roomZones=zones.filter(z=>Number(z.room_id)===Number(room.id));
@@ -644,15 +644,20 @@ function printOasiReservations(mode='plan'){
  .sheet-title{display:flex;align-items:end;justify-content:space-between;margin:1mm 0 3mm;flex-shrink:0}.eyebrow{display:block;font-size:7pt;color:#9b7950;letter-spacing:2px;font-weight:700}.sheet-title h1{margin:1mm 0 0;font:normal 22pt Georgia,serif}
  .sheet-room-name{font:normal 13pt Arial,sans-serif;margin:1.5mm 0 0;color:#514334}
  .sheet-counter{font-size:9pt;color:#75624d;text-align:right;align-self:end;max-width:48%}
- .room-figure{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;overflow:hidden;width:100%;background:#fffdfa}
+ .room-figure{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;overflow:hidden;width:100%;background:#fffdfa;padding:1mm}
  .room-svg{display:block;width:100%;height:100%;min-height:0;max-width:100%;max-height:100%}
- .plan-bookings{flex:0 0 auto;margin-top:3mm;break-inside:avoid}
+ .print-group-key{display:flex;align-items:center;flex-wrap:wrap;gap:1.5mm 3mm;margin:2mm 0 1mm;font-size:8.4pt;color:#315a3b;flex:0 0 auto}
+ .print-group-key>strong{font-size:8pt;text-transform:uppercase;letter-spacing:.06em;margin-right:1mm}
+ .print-group-key span{display:inline-block;padding:1.3mm 2.5mm;border:1.4px solid #62866a;background:#e5efe6;border-radius:4px;white-space:nowrap}
+ .print-group-key b,.booking-ref{font-weight:800;color:#245337}
+ .booking-ref{display:inline-block;border:1px solid #76947c;border-radius:3px;padding:1px 5px;background:#e5efe6}
+ .plan-bookings{flex:0 0 auto;margin-top:2mm;break-inside:avoid}
  .plan-bookings-title{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #decdb7;padding-top:2.5mm;font-size:9pt;font-weight:700;letter-spacing:.02em}
  .plan-bookings-title small{font-size:8pt;color:#816d57;font-weight:400}
- .plan .bookings{margin:2mm 0 0;font-size:9pt;table-layout:fixed}
+ .plan .bookings{margin:2mm 0 0;font-size:9.2pt;table-layout:fixed}
  .plan .bookings th{font-size:8pt}
- .plan .bookings th,.plan .bookings td{padding:1.6mm 1.8mm;line-height:1.15}
- .plan .bookings th:nth-child(1){width:13%}.plan .bookings th:nth-child(3){width:12%}.plan .bookings th:nth-child(4){width:15%}.plan .bookings th:nth-child(5){width:24%}
+ .plan .bookings th,.plan .bookings td{padding:1.65mm 1.4mm;line-height:1.25;vertical-align:middle}.plan .bookings td strong{font-weight:700}.plan .bookings-party{font-weight:800}
+ .plan .bookings th:nth-child(1){width:9%}.plan .bookings th:nth-child(2){width:11%}.plan .bookings th:nth-child(4){width:10%}.plan .bookings th:nth-child(5){width:16%}.plan .bookings th:nth-child(6){width:23%}
  .sheet-foot{border-top:1px solid #e7d9c6;display:flex;justify-content:space-between;padding-top:2mm;margin-top:3mm;flex-shrink:0;color:#8b7457;font-size:7pt;letter-spacing:1px}
  .bookings{width:100%;border-collapse:collapse;margin-top:4mm;font-size:11pt;table-layout:fixed}.bookings th,.bookings td{border-bottom:1px solid #dfd4c4;padding:3mm 2mm;text-align:left;overflow-wrap:anywhere}.bookings th{background:#f5efe6;font-size:9pt;color:#7b6244}.bookings th:nth-child(1){width:13%}.bookings th:nth-child(3){width:14%}.bookings th:nth-child(4){width:14%}.bookings th:nth-child(5){width:22%}
  @page {size:A4 portrait;margin:8mm}
@@ -673,8 +678,8 @@ function printOasiReservations(mode='plan'){
      const {svg,portrait}=svgRoom(room,tables,zones,structures,items,links);
      const roomBookings=items.filter(r=>Number(r.room_id)===Number(room.id));
      const count=roomBookings.length, totalGuests=roomBookings.reduce((n,r)=>n+Number(r.party_size||0),0);
-     const tableHeight=Math.max(22,Math.min(80,11+count*7));
-     const content=`<div class="room-figure" style="max-height:calc(100% - ${tableHeight}mm)">${svg}</div><div class="plan-bookings"><div class="plan-bookings-title"><span>Elenco prenotazioni · ${esc(serviceLabel(svc))}</span><small>${count} prenotazioni · ${totalGuests} coperti</small></div>${listTable(roomBookings)}</div>`;
+     const tableHeight=Math.max(24,Math.min(85,12+count*6.5));
+     const groups=roomBookings.filter(r=>String(r.table_ids||'').split(',').filter(Boolean).length>1).sort((a,b)=>String(a.time).localeCompare(String(b.time))||Number(a.id)-Number(b.id));const ordered=[...roomBookings].sort((a,b)=>String(a.time).localeCompare(String(b.time))||Number(a.id)-Number(b.id));const groupKey=groups.length?`<div class="print-group-key"><strong>Tavoli uniti</strong>${groups.map(r=>`<span><b>P${ordered.indexOf(r)+1}</b> · ${esc(r.table_codes||'')} · ${Number(r.party_size)} ospiti</span>`).join('')}</div>`:'';const content=`<div class="room-figure" style="max-height:calc(100% - ${tableHeight+(groups.length?12:0)}mm)">${svg}</div>${groupKey}<div class="plan-bookings"><div class="plan-bookings-title"><span>Elenco prenotazioni · ${esc(serviceLabel(svc))}</span><small>${count} prenotazioni · ${totalGuests} coperti</small></div>${listTable(roomBookings,true)}</div>`;
      generated.push(buildPage(room.name,`${count} prenotazioni · ${totalGuests} coperti`,content,!portrait,'plan',svc));
     }
    }
