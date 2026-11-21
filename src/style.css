@@ -1603,3 +1603,15 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .admin .oasi-agenda-entry-side{grid-column:1/-1;padding-top:4px}
  .admin .oasi-agenda-entry-actions .mini{min-height:44px}
 }
+
+
+/* Oasi: ricerca veloce e comandi operativi dell'agenda */
+.oasi-agenda-search{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:18px 0 22px;padding:16px 20px;border:1px solid #e7dfd3;border-radius:16px;background:#fff}
+.oasi-agenda-search label{font-size:13px;font-weight:700;color:#62513c}
+.oasi-agenda-search input{flex:1 1 270px;min-width:0;max-width:520px;padding:12px 15px;border:1px solid #ded5c7;border-radius:11px;background:#fbfaf8;font:inherit;color:#302b26}
+.oasi-agenda-search input:focus-visible{outline:2px solid #96714b;outline-offset:2px}
+.oasi-agenda-search-count{margin-left:auto;font-size:12px;color:#776958}
+.oasi-agenda-entry[hidden]{display:none!important}
+.oasi-agenda-next{background:#e9f2e9!important;border-color:#bad3bc!important;color:#234c2b!important;font-weight:700!important}
+@media(max-width:640px){.oasi-agenda-search{padding:13px;gap:8px}.oasi-agenda-search label{width:100%}.oasi-agenda-search input{flex-basis:100%}.oasi-agenda-search-count{margin-left:0}.oasi-agenda-next{width:100%}}
+@media print{.oasi-agenda-search,.oasi-agenda-next{display:none!important}}
