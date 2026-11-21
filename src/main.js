@@ -858,7 +858,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="Numero di telefono"></label>
    <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
    <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
-   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
+   ${banquet&&!editing?`<section class="oasi-banquet-tables"><h3>Tavoli del banchetto</h3><p>Seleziona più gruppi di tavoli separati nella stessa sala. Gli altri restano disponibili per le prenotazioni normali.</p><label>Sala<select id="oasi-banquet-room"></select></label><div id="oasi-banquet-list" aria-live="polite"></div><p id="oasi-banquet-capacity" aria-live="polite"></p><button class="mini" type="button" id="oasi-banquet-refresh">Aggiorna disponibilità</button></section>`:editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
    <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
    <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
    <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">${editing?'Salva modifiche':'Registra prenotazione'}</button></footer>
@@ -916,7 +916,7 @@ function openNewBookingDrawer(_event=null,editing=null){
   };
   room.onchange=()=>{selectedTables=[];paint()};list.onchange=e=>{if(e.target.type!=='checkbox')return;const id=Number(e.target.value);selectedTables=e.target.checked?[...selectedTables,id]:selectedTables.filter(x=>x!==id);update()};form.elements.party_size.addEventListener('input',refreshCapacity);form.elements.date.addEventListener('change',load);serviceInput.addEventListener('change',load);form.querySelector('#oasi-edit-refresh').onclick=load;load();
  }
- if(!editing){
+ if(!editing&&!banquet){
   const suggestionSelect=form.elements.suggested_table,hint=form.querySelector('#oasi-suggestion-hint');
   let suggestionVersion=0,suggestedOptions=[],suggestionTimer;const largePanel=form.querySelector('#oasi-large-party'),largeCheck=form.querySelector('#oasi-join-confirm');
   const updateLargeParty=()=>{const large=Number(form.elements.party_size.value)>9;largePanel.hidden=!large;if(!large){largeCheck.checked=false;submit.disabled=false}else submit.disabled=!largeCheck.checked||suggestionSelect.value==='';};
@@ -947,15 +947,57 @@ function openNewBookingDrawer(_event=null,editing=null){
   form._oasiLargeValid=()=>Number(form.elements.party_size.value)<=9||(largeCheck.checked&&!!form._oasiSelectedRecommendation());
   refreshSuggestions();
  }
+ if(banquet&&!editing){
+  const roomEl=form.querySelector('#oasi-banquet-room'),list=form.querySelector('#oasi-banquet-list'),capacity=form.querySelector('#oasi-banquet-capacity');
+  let tables=[],chosen=new Set(),loading=false,version=0;
+  const check=()=>{
+   const selected=tables.filter(t=>chosen.has(Number(t.id))&&Number(t.room_id)===Number(roomEl.value));
+   const min=selected.reduce((sum,t)=>sum+Number(t.min_seats||1),0),max=selected.reduce((sum,t)=>sum+Number(t.seats||0),0);
+   const party=Number(form.elements.party_size.value);
+   const valid=!loading&&selected.length>0&&selected.length<=8&&Number.isInteger(party)&&party>=min&&party<=max;
+   capacity.textContent=selected.length?selected.length+' tavoli selezionati · '+min+'–'+max+' posti. '+(valid?'Capienza compatibile.':'Numero di ospiti non compatibile o limite di 8 tavoli superato.'):'Seleziona i tavoli da riservare al banchetto.';
+   submit.disabled=saving||!valid;
+   return {valid,selected};
+  };
+  const paint=()=>{
+   const available=tables.filter(t=>Number(t.room_id)===Number(roomEl.value));
+   list.innerHTML=available.length?available.map(t=>'<label class="oasi-banquet-table"><input type="checkbox" value="'+Number(t.id)+'" '+(chosen.has(Number(t.id))?'checked':'')+'><span><strong>Tavolo '+esc(t.code)+'</strong> · '+Number(t.min_seats||1)+'–'+Number(t.seats)+' posti</span></label>').join(''):'<p>Nessun tavolo libero in questa sala per il servizio selezionato.</p>';
+   check();
+  };
+  const load=async()=>{
+   const sequence=++version;loading=true;submit.disabled=true;list.textContent='Verifica disponibilità…';
+   try{
+    const result=await api('admin/operations?'+new URLSearchParams({date:form.elements.date.value,service:form.elements.service.value}));
+    if(sequence!==version||!layer.isConnected)return;
+    const busy=new Set((result.reservations||[]).filter(r=>r.status==='confirmed').flatMap(r=>String(r.table_ids||'').split(',').map(Number)));
+    const closed=new Set((result.blocks||[]).filter(b=>b.scope==='table').map(b=>Number(b.target_id)));
+    const rooms=(result.rooms||[]).filter(r=>Number(r.internal_enabled)&&!(result.blocks||[]).some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===Number(r.id))));
+    const prior=roomEl.value;
+    roomEl.innerHTML=rooms.map(r=>'<option value="'+Number(r.id)+'">'+esc(r.name)+'</option>').join('');
+    if(rooms.some(r=>String(r.id)===prior))roomEl.value=prior;
+    tables=(result.tables||[]).filter(t=>Number(t.enabled)&&rooms.some(r=>Number(r.id)===Number(t.room_id))&&!busy.has(Number(t.id))&&!closed.has(Number(t.id)));
+    chosen=new Set([...chosen].filter(id=>tables.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(roomEl.value))));
+    loading=false;paint();
+   }catch(err){if(sequence!==version)return;loading=false;tables=[];chosen.clear();list.textContent=err.message;check();}
+  };
+  roomEl.addEventListener('change',()=>{chosen.clear();paint()});
+  list.addEventListener('change',e=>{if(!e.target.matches('input[type="checkbox"]'))return;const id=Number(e.target.value);if(e.target.checked)chosen.add(id);else chosen.delete(id);check()});
+  form.elements.party_size.addEventListener('input',check);
+  form.elements.date.addEventListener('change',load);
+  form.elements.service.addEventListener('change',load);
+  form.querySelector('#oasi-banquet-refresh').addEventListener('click',load);
+  form._oasiBanquetSelection=()=>{const selected=check();return selected.valid?{table_ids:selected.selected.map(t=>Number(t.id)),room_id:Number(roomEl.value)}:null};
+  load();
+ }
  customerAutocomplete(form);
  form.addEventListener('submit',async e=>{
   e.preventDefault();if(saving||submit.disabled)return;
-  if(!editing&&!form._oasiLargeValid?.()){msg('Per gruppi oltre 9 persone scegli i tavoli collegati e conferma l’unione.','error');return}
+  if(!editing&&!banquet&&!form._oasiLargeValid?.()){msg('Per gruppi oltre 9 persone scegli i tavoli collegati e conferma l’unione.','error');return}
   saving=true;submit.disabled=true;submit.textContent='Salvataggio...';
   let created=null;
   try{
    const payload=inputData(form);
-   if(!editing){delete payload.suggested_table;delete payload.join_tables;const selection=form._oasiSelectedRecommendation?.();if(selection){payload.room_id=selection.room_id;payload.table_ids=selection.table_ids}}
+   if(!editing){delete payload.suggested_table;delete payload.join_tables;const selection=banquet?form._oasiBanquetSelection?.():form._oasiSelectedRecommendation?.();if(banquet&&!selection)throw Error('Seleziona tavoli liberi con capienza compatibile per il banchetto.');if(selection){payload.room_id=selection.room_id;payload.table_ids=selection.table_ids}if(banquet)payload.banquet_shared=true;}
    created=editing?await api('admin/reservations/'+editing.id,'PATCH',{...payload,action:'edit_full',table_ids:selectedTables,expected}):await api('admin/reservations','POST',payload);
    state.date=payload.date;state.reservationService='all';state.agendaManualSelection=payload.date!==oasiItalianToday();if(editing){state.adminView='reservations';}
    const savedRows=await api('admin/reservations?date='+encodeURIComponent(payload.date)+'&service='+encodeURIComponent(payload.service));
