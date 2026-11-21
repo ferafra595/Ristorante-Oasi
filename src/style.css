@@ -1533,3 +1533,13 @@ body.oasi-booking-drawer-open{overflow:hidden}
  .admin .oasi-service-guest-empty{font-size:14px;color:#756b5f}
 }
 @media(max-width:380px){.admin .op-service-list{padding:12px!important}.admin .oasi-service-guest{padding:13px}.admin .oasi-service-guest-actions>*{flex:1 1 100%}}
+
+
+@media(max-width:900px){
+ .admin .oasi-service-mobile-heading{display:grid;gap:4px;padding:3px 2px 6px}
+ .admin .oasi-service-mobile-heading .eyebrow{font-size:10px;letter-spacing:.17em;color:#9d7750;margin:0}
+ .admin .oasi-service-mobile-heading h3{font-family:'Playfair Display',serif;font-size:clamp(25px,7vw,34px);line-height:1.1;font-weight:400;margin:0;color:#2c2721}
+ .admin .oasi-service-mobile-heading p{font-size:13px;color:#756b5f;line-height:1.5;margin:2px 0 0}
+ .admin .oasi-service-mobile-cards{margin:10px 0 22px}
+ .admin .oasi-service-next:focus-visible,.admin .oasi-service-edit:focus-visible,.admin .oasi-service-call:focus-visible{outline:3px solid #ac8757;outline-offset:3px}
+}
