@@ -14,12 +14,12 @@ test('Consiglia tavolo singolo proporzionato senza sprecare posti',()=>{
  assert.deepEqual(recommend([t(1,1,3),t(2,1,4)],3),[1]);
 });
 test('Combina solo tavoli della stessa sala quando serve',()=>{
- const result=recommend([t(1,1,3),t(2,1,3),t(3,2,4)],5);
+ const result=recommend([t(1,1,3),t(2,1,3),t(3,2,4)],5,[{table_a:1,table_b:2}]);
  assert.deepEqual(result,[1,2]);
 });
 test('Non supera il limite massimo di otto tavoli',()=>{
- assert.equal(recommend(Array.from({length:10},(_,i)=>t(i+1,1,2)),18).length,0);
- assert.equal(recommend(Array.from({length:10},(_,i)=>t(i+1,1,2)),16).length,8);
+ assert.equal(recommend(Array.from({length:10},(_,i)=>t(i+1,1,2)),18,Array.from({length:9},(_,i)=>({table_a:i+1,table_b:i+2}))).length,0);
+ assert.equal(recommend(Array.from({length:10},(_,i)=>t(i+1,1,2)),16,Array.from({length:9},(_,i)=>({table_a:i+1,table_b:i+2}))).length,8);
 });
 test('Rispetta i minimi di capienza e non suggerisce tavoli non compatibili',()=>{
  assert.deepEqual(recommend([t(1,1,8,6),t(2,1,2)],2),[2]);
@@ -34,4 +34,14 @@ test('Interfaccia conserva conferma manuale e salvataggio verificato dal server'
  assert.ok(source.includes('id="oasi-edit-recommend"'));
  assert.ok(source.includes('Combinazione proposta. Controlla e salva per confermare.'));
  assert.ok(source.includes("action:'edit_full',table_ids:selectedTables,expected"));
+});
+
+test('Non combina tavoli nella stessa sala senza collegamenti espliciti',()=>{
+ assert.deepEqual(recommend([t(1,1,2),t(2,1,2)],4,[]),[]);
+ assert.deepEqual(recommend([t(1,1,2),t(2,1,2)],4,[{table_a:1,table_b:2}]),[1,2]);
+});
+test('Non collega gruppi separati, ammette una catena adiacente',()=>{
+ const rows=[t(1,1,2),t(2,1,2),t(3,1,2)];
+ assert.deepEqual(recommend(rows,6,[{table_a:1,table_b:2}]),[]);
+ assert.deepEqual(recommend(rows,6,[{table_a:1,table_b:2},{table_a:2,table_b:3}]),[1,2,3]);
 });
