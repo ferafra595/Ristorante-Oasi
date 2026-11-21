@@ -117,7 +117,7 @@ const oasiWinterOverflowAllowed=cfg=>
  &&Number.isSafeInteger(Number(cfg?.firstFloorOverflowCapacity))
  &&Number(cfg.firstFloorOverflowCapacity)>0&&Number(cfg.firstFloorOverflowCapacity)<=500;
 async function oasiOverflowCandidate(db,cfg,date,service,party){
- if(!oasiWinterOverflowAllowed(cfg))return null;
+ if(!oasiWinterOverflowAllowed(cfg)||cfg?.disabledDatesByRoom?.['2']?.includes(date))return null;
  if(!(await db.prepare('SELECT version FROM oasi_schema_versions WHERE version=12').first().catch(()=>null)))return null;
  const room=await db.prepare('SELECT id,name,internal_enabled FROM rooms WHERE id=2').first();
  if(!room||!Number(room.internal_enabled))return null;
