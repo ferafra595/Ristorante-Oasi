@@ -171,7 +171,7 @@ async function oasiLinkedTables(db,ids){
 }
 // Staff-only choice: a temporary group of free tables in the same room.
 // Does NOT modify the standard floor plan or allow public customers to bypass linked-table rules.
-async function manualTableCandidate(db,roomIds,date,service,party,selected,excludeId=0){
+async function manualTableCandidate(db,roomIds,date,service,party,selected,excludeId=0,banquet=false){
  
  if(!Array.isArray(selected)||selected.length<1||selected.length>8)return null;
  const ids=selected.map(Number);
@@ -192,7 +192,7 @@ async function manualTableCandidate(db,roomIds,date,service,party,selected,exclu
  const max=tables.reduce((n,t)=>n+Number(t.seats),0);
  const min=tables.reduce((n,t)=>n+Number(t.min_seats),0);
  if(party<min||party>max)return null;
- if(!(await oasiLinkedTables(db,ids)))return null;
+ if(!banquet&&!(await oasiLinkedTables(db,ids)))return null;
  return {ids,room_id:roomId,capacity:max,code:tables.map(t=>t.code).join('+')};
 }
 // Analizza le cause reali di indisponibilità, senza confondere cerimonie,
@@ -236,7 +236,7 @@ async function bookingUnavailableReason(db,roomIds,date,service,party,admin=fals
  }
  return `Nessun tavolo compatibile e disponibile per ${party} persone durante il ${when}.${eventNote}${blockedNote}`;
 }
-async function manualTableUnavailableReason(db,roomIds,date,service,party,selected,excludeId=0){
+async function manualTableUnavailableReason(db,roomIds,date,service,party,selected,excludeId=0,banquet=false){
  const when=`${serviceIt(service)} del ${dateIt(date)}`;
  const ids=selected.map(Number);
  if(ids.some(id=>!Number.isSafeInteger(id)||id<=0)||ids.length>8||new Set(ids).size!==ids.length)return 'Selezione tavoli non valida: scegli da 1 a 8 tavoli diversi.';
@@ -258,7 +258,7 @@ async function manualTableUnavailableReason(db,roomIds,date,service,party,select
  const occupied=await db.prepare(`SELECT DISTINCT t.code FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id
  WHERE rt.book_date=? AND rt.service=? AND rt.reservation_id<>? AND rt.table_id IN (${marks})`).bind(date,service,excludeId,...ids).all();
  if(occupied.results?.length)return `Tavolo ${occupied.results.map(t=>t.code).join(', ')} già prenotato per il ${when}.`;
- if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti devono essere collegati in verticale e senza interruzioni. Seleziona una colonna di tavoli accostabili.';
+ if(!banquet&&!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti devono essere collegati in verticale e senza interruzioni. Seleziona una colonna di tavoli accostabili.';
  const max=tables.reduce((n,t)=>n+Number(t.seats),0),min=tables.reduce((n,t)=>n+Number(t.min_seats),0);
  if(party>max||party<min)return `Capienza non compatibile: i tavoli selezionati accolgono da ${min} a ${max} persone, mentre la prenotazione è per ${party}.`;
  return `Impossibile assegnare i tavoli scelti per il ${when}. Aggiorna la piantina e riprova.`;
@@ -268,17 +268,17 @@ const hours=cfg[svc]||{};if(!admin){if(!hours.enabled||minutes(tm)<minutes(hours
 async function saveBooking(ctx,b,admin=false){const db=ctx.env.DB;const {d,tm,svc,party,ids}=await validateBooking(db,b,admin);const name=clean(b.name,120),phone=clean(b.phone,40),mail=clean(b.email,180).toLowerCase(),notes=clean(b.notes,600);if(!name||!phone||!validEmail(mail))throw Error('Nome, telefono ed email valida sono obbligatori');const usable=(admin&&b.room_id)?ids.filter(id=>Number(id)===Number(b.room_id)):ids;let opts;
 if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length){
  const requested=b.table_ids.map(Number);
- const explicit=await manualTableCandidate(db,usable,d,svc,party,requested);
- if(!explicit)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,requested));
+ const explicit=await manualTableCandidate(db,usable,d,svc,party,requested,0,b.banquet_shared===true);
+ if(!explicit)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,requested,0,b.banquet_shared===true));
  opts=[explicit]; // Never silently assign different tables when staff requested exact IDs.
-}else{opts=await candidates(db,usable,d,svc,party)}
-if(!opts.length)throw Error(await bookingUnavailableReason(db,usable,d,svc,party,admin));const token=rand(),hashed=await digest(token);for(const o of opts.slice(0,8)){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?'staff':'web',o.room_id,hashed);const seq=await db.batch([insert,db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) SELECT (SELECT id FROM reservations WHERE cancel_token_hash=?),value,?,? FROM json_each(?)').bind(hashed,d,svc,JSON.stringify(o.ids)),db.prepare('UPDATE reservations SET party_size=party_size WHERE cancel_token_hash=?').bind(hashed)]);const id=Number(seq[0].meta.last_row_id);const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;
-const booking={id,book_date:d,service:svc,time:tm,party_size:party,name,phone,email:mail,source:admin?'staff':'web'};
+}else{if(admin&&b.banquet_shared===true)throw Error('Seleziona i tavoli riservati al banchetto.');opts=await candidates(db,usable,d,svc,party)}
+if(!opts.length)throw Error(await bookingUnavailableReason(db,usable,d,svc,party,admin));const token=rand(),hashed=await digest(token);for(const o of opts.slice(0,8)){try{const insert=db.prepare('INSERT INTO reservations(book_date,service,time,party_size,name,email,phone,notes,source,room_id,cancel_token_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(d,svc,tm,party,name,mail,phone,notes,admin?(b.banquet_shared===true?'staff_banquet':'staff'):'web',o.room_id,hashed);const seq=await db.batch([insert,db.prepare('INSERT INTO reservation_tables(reservation_id,table_id,book_date,service) SELECT (SELECT id FROM reservations WHERE cancel_token_hash=?),value,?,? FROM json_each(?)').bind(hashed,d,svc,JSON.stringify(o.ids)),db.prepare('UPDATE reservations SET party_size=party_size WHERE cancel_token_hash=?').bind(hashed)]);const id=Number(seq[0].meta.last_row_id);const origin=ctx.env.PUBLIC_URL||new URL(ctx.request.url).origin;const cancellation=origin+'/annulla?token='+token;
+const booking={id,book_date:d,service:svc,time:tm,party_size:party,name,phone,email:mail,source:admin?(b.banquet_shared===true?'staff_banquet':'staff'):'web'};
 let mailResult={status:'unconfigured'};
 try{await syncCustomer(db,booking);await alertStaff(db,id,'new','Nuova prenotazione #'+id,`${d} ${svc==='lunch'?'Pranzo':'Cena'} · ${tm} · ${name} · ${party} persone`)}catch(e){console.error('Oasi fase2 post-book',e)}
 try{mailResult=await emailForBooking(ctx,booking,'confirm',cancellation);await emailStaff(ctx,booking,'new')}catch(e){console.error('Oasi email confirm',e)}
 return {id,date:d,service:svc,time:tm,party_size:party,room_id:o.room_id,table_ids:o.ids,cancel_url:cancellation,email_status:mailResult.status,email_sent_configured:!!(ctx.env.RESEND_API_KEY&&ctx.env.EMAIL_FROM)};
-}catch(e){const detail=String(e);if(/oasi_(event_room_reserved|manual_block|table_disabled|room_disabled|capacity_invalid)|UNIQUE constraint failed/.test(detail)){if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,b.table_ids));continue}console.error('Oasi booking transaction',e);throw Error('Non è stato possibile registrare la prenotazione. Aggiorna la disponibilità e riprova.')}}throw Error('Disponibilità appena esaurita: '+await bookingUnavailableReason(db,usable,d,svc,party,admin))}
+}catch(e){const detail=String(e);if(/oasi_(event_room_reserved|manual_block|table_disabled|room_disabled|capacity_invalid)|UNIQUE constraint failed/.test(detail)){if(admin&&Array.isArray(b.table_ids)&&b.table_ids.length)throw Error(await manualTableUnavailableReason(db,usable,d,svc,party,b.table_ids,0,b.banquet_shared===true));continue}console.error('Oasi booking transaction',e);throw Error('Non è stato possibile registrare la prenotazione. Aggiorna la disponibilità e riprova.')}}throw Error('Disponibilità appena esaurita: '+await bookingUnavailableReason(db,usable,d,svc,party,admin))}
 async function phase7Ready(db){
  try{return !!(await db.prepare('SELECT version FROM oasi_schema_versions WHERE version=11').first())}catch{return false}
 }
@@ -594,8 +594,8 @@ if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url
  const moving=d!==old.book_date||svc!==old.service;
  const visit=await db.prepare('SELECT state FROM service_visits WHERE reservation_id=?').bind(id).first();
  if(moving&&visit&&visit.state!=='expected')return fail('Ripristina lo stato Atteso prima di cambiare data o servizio.',409);
- const candidate=await manualTableCandidate(db,ids,d,svc,party,b.table_ids,id);
- if(!candidate)return fail(Array.isArray(b.table_ids)&&b.table_ids.length?await manualTableUnavailableReason(db,ids,d,svc,party,b.table_ids,id):'Seleziona almeno un tavolo disponibile.',409);
+ const candidate=await manualTableCandidate(db,ids,d,svc,party,b.table_ids,id,old.source==='staff_banquet');
+ if(!candidate)return fail(Array.isArray(b.table_ids)&&b.table_ids.length?await manualTableUnavailableReason(db,ids,d,svc,party,b.table_ids,id,old.source==='staff_banquet'):'Seleziona almeno un tavolo disponibile.',409);
  try{
   await db.batch([
    db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM reservations WHERE id=? AND ${fields.map(k=>k+' IS ?').join(' AND ')}) AND COALESCE((SELECT group_concat(table_id,',') FROM (SELECT table_id FROM reservation_tables WHERE reservation_id=? ORDER BY table_id)),'')=? AND (?=0 OR COALESCE((SELECT state FROM service_visits WHERE reservation_id=?),'expected')='expected') THEN 1 ELSE json('oasi_stale_edit') END guard`).bind(id,...fields.map(k=>old[k]),id,originalIds.join(','),moving?1:0,id),
@@ -630,8 +630,8 @@ if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url
  const tableIds=Array.isArray(b.table_ids)?b.table_ids.map(Number):[];
  if(!tableIds.length)return fail('Indica i tavoli da assegnare');
  const roomIds=(await db.prepare('SELECT id FROM rooms WHERE internal_enabled=1').all()).results.map(r=>Number(r.id));
- const candidate=await manualTableCandidate(db,roomIds,old.book_date,old.service,old.party_size,tableIds,id);
- if(!candidate)return fail(await manualTableUnavailableReason(db,roomIds,old.book_date,old.service,old.party_size,tableIds,id),409);
+ const candidate=await manualTableCandidate(db,roomIds,old.book_date,old.service,old.party_size,tableIds,id,old.source==='staff_banquet');
+ if(!candidate)return fail(await manualTableUnavailableReason(db,roomIds,old.book_date,old.service,old.party_size,tableIds,id,old.source==='staff_banquet'),409);
  try{
   await db.batch([
    db.prepare('DELETE FROM reservation_tables WHERE reservation_id=?').bind(id),
