@@ -93,3 +93,20 @@ test('ADMIN table suggestions preserve validations for date, service and party s
   assert.equal(response.status,400);
  }
 });
+
+
+test('service arrival progression never releases or duplicates booked tables',async()=>{
+ const x=await setup();
+ const reservation=await x.book([1],5);
+ ok(reservation,201);
+ const id=reservation.body.id;
+ for(const state of ['arrived','seated','finished']){
+  ok(await x.call('admin/visits/'+id,'PATCH',{state}));
+  const row=x.db.sql.prepare('SELECT state FROM service_visits WHERE reservation_id=?').get(id);
+  assert.equal(row.state,state);
+  assert.deepEqual(x.assigned(id),[1]);
+  assert.equal(x.rows().find(r=>r.id===id).status,'confirmed');
+ }
+ ok(await x.call('admin/visits/'+id,'PATCH',{state:'expected'}));
+ assert.deepEqual(x.assigned(id),[1]);
+});
