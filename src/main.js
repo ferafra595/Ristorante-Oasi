@@ -757,7 +757,23 @@ function bindEvents(){
  document.querySelector('#event-all')?.addEventListener('click',()=>{state.eventRange={start:'',end:''};renderAdmin()});
 }
 // Consiglio operativo, solo per il personale: non prenota e non modifica la piantina.
-const oasiRecommendStaffTables=(tables,party)=>{
+// Le unioni sono consentite solo attraverso collegamenti configurati in piantina.
+const oasiConnectedTableIds=(ids,links)=>{
+ if(ids.length<=1)return true;
+ const allowed=new Set(ids.map(Number)),visited=new Set([Number(ids[0])]);
+ let progress=true;
+ while(progress){
+  progress=false;
+  for(const link of links||[]){
+   const a=Number(link.table_a),b=Number(link.table_b);
+   if(!allowed.has(a)||!allowed.has(b))continue;
+   if(visited.has(a)&&!visited.has(b)){visited.add(b);progress=true}
+   else if(visited.has(b)&&!visited.has(a)){visited.add(a);progress=true}
+  }
+ }
+ return visited.size===allowed.size;
+};
+const oasiRecommendStaffTables=(tables,party,links=[])=>{
  if(!Number.isSafeInteger(party)||party<1||party>200)return [];
  const rooms=new Map();
  for(const t of tables){
@@ -768,25 +784,35 @@ const oasiRecommendStaffTables=(tables,party)=>{
  }
  let best=null,bestScore=null;
  for(const [room,arr] of rooms){
-  const dp=new Map([['0:0:0',{ids:[],min:0,max:0}]]);
-  for(const t of arr.slice(0,40)){
-   for(const prev of [...dp.values()]){
-    if(prev.ids.length>=8)continue;
-    const next={ids:[...prev.ids,t.id],min:prev.min+t.min,max:prev.max+t.max};
-    if(next.min>party)continue;
-    const key=next.ids.length+':'+next.min+':'+next.max;
-    if(!dp.has(key))dp.set(key,next);
-   }
+  const byId=new Map(arr.map(t=>[t.id,t])),adj=new Map(arr.map(t=>[t.id,new Set()]));
+  for(const l of links){
+   const a=Number(l.table_a),b=Number(l.table_b);
+   if(byId.has(a)&&byId.has(b)){adj.get(a).add(b);adj.get(b).add(a)}
   }
-  for(const option of dp.values()){
-   if(!option.ids.length||option.min>party||option.max<party)continue;
-   const score=[option.ids.length,option.max-party,party-option.min,room,...option.ids];
-   if(!bestScore||score.findIndex((n,i)=>n!==bestScore[i])>=0&&score[score.findIndex((n,i)=>n!==bestScore[i])]<bestScore[score.findIndex((n,i)=>n!==bestScore[i])]){
-    bestScore=score;best=option;
+  const seen=new Set();let explored=0;
+  for(const root of arr){
+   const queue=[{ids:[root.id],min:root.min,max:root.max}];
+   while(queue.length&&explored<15000){
+    const option=queue.shift();explored++;
+    const key=[...option.ids].sort((a,b)=>a-b).join(',');
+    if(seen.has(key))continue;seen.add(key);
+    if(option.min<=party&&option.max>=party){
+     const score=[option.ids.length,option.max-party,party-option.min,room,...[...option.ids].sort((a,b)=>a-b)];
+     const different=bestScore?score.findIndex((n,i)=>n!==bestScore[i]):-1;
+     if(!bestScore||(different>=0&&score[different]<bestScore[different])){bestScore=score;best=[...option.ids]}
+    }
+    if(option.ids.length>=8||option.min>=party)continue;
+    const neighbors=new Set(option.ids.flatMap(id=>[...adj.get(id)||[]]));
+    for(const id of neighbors){
+     if(option.ids.includes(id))continue;
+     const t=byId.get(id);
+     if(option.min+t.min>party)continue;
+     queue.push({ids:[...option.ids,id],min:option.min+t.min,max:option.max+t.max});
+    }
    }
   }
  }
- return best?best.ids:[];
+ return best?best.sort((a,b)=>a-b):[];
 };
 function openEditBookingDrawer(row){if(row)openNewBookingDrawer(null,row)}
 function openNewBookingDrawer(_event=null,editing=null){
@@ -831,26 +857,26 @@ function openNewBookingDrawer(_event=null,editing=null){
  document.addEventListener('keydown',onKey);
  const serviceInput=form.elements.service,timeInput=form.elements.time;
  serviceInput.addEventListener('change',()=>{const prev=timeInput.value;if(['12:30','19:30'].includes(prev))timeInput.value=serviceInput.value==='lunch'?'12:30':'19:30'});
- let selectedTables=[],available=[],freeTables=[],loading=false,loadVersion=0,expected=null;
+ let selectedTables=[],available=[],freeTables=[],tableLinks=[],loading=false,loadVersion=0,expected=null;
  if(editing){
   for(const k of ['time','party_size','name','phone','email','notes'])form.elements[k].value=editing[k]??'';
   form.elements.date.value=editing.book_date;
   selectedTables=String(editing.table_ids||'').split(',').filter(Boolean).map(Number).sort((a,b)=>a-b);
   expected={...Object.fromEntries(['book_date','service','time','party_size','name','phone','email','notes','room_id','status'].map(k=>[k,editing[k]])),table_ids:[...selectedTables]};
   const room=form.elements.edit_room,list=form.querySelector('#oasi-edit-table-list'),capacity=form.querySelector('#oasi-edit-capacity');
-  const update=()=>{const picked=available.filter(t=>selectedTables.includes(Number(t.id)));const min=picked.reduce((n,t)=>n+Number(t.min_seats||1),0),max=picked.reduce((n,t)=>n+Number(t.seats),0),party=Number(form.elements.party_size.value);const valid=!loading&&picked.length===selectedTables.length&&picked.length>0&&picked.length<=8&&party>=min&&party<=max;capacity.textContent=picked.length?`Capienza ${min}–${max} persone · ${picked.length} tavoli selezionati`:'Seleziona almeno un tavolo disponibile';submit.disabled=saving||!valid;return valid};
+  const update=()=>{const picked=available.filter(t=>selectedTables.includes(Number(t.id)));const min=picked.reduce((n,t)=>n+Number(t.min_seats||1),0),max=picked.reduce((n,t)=>n+Number(t.seats),0),party=Number(form.elements.party_size.value);const connected=oasiConnectedTableIds(selectedTables,tableLinks);const valid=!loading&&picked.length===selectedTables.length&&picked.length>0&&picked.length<=8&&party>=min&&party<=max&&connected;capacity.textContent=picked.length?`Capienza ${min}–${max} persone · ${picked.length} tavoli selezionati` :'Seleziona almeno un tavolo disponibile';if(picked.length>1&&!connected)capacity.textContent='Questi tavoli non sono collegati nella piantina: scegli tavoli adiacenti.';submit.disabled=saving||!valid;return valid};
   // Proponi soltanto tavoli liberi dimensionati alla prenotazione:
   // per 2 persone, soltanto tavoli fino a 3 posti; i tavoli piccoli possono essere uniti.
   const fitsParty=(t)=>{const party=Number(form.elements.party_size.value),min=Number(t.min_seats||1),max=Number(t.seats);return Number.isInteger(party)&&party>0&&Number.isFinite(min)&&Number.isFinite(max)&&min<=party&&min<=max&&max>=1&&max<=party+1};
   const refreshCapacity=()=>{available=freeTables.filter(fitsParty);selectedTables=selectedTables.filter(id=>available.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(room.value)));paint()};
   const paint=()=>{const tables=available.filter(t=>Number(t.room_id)===Number(room.value));const party=Number(form.elements.party_size.value);list.innerHTML=tables.length?tables.map(t=>`<label class="oasi-edit-table"><input type="checkbox" value="${Number(t.id)}" ${selectedTables.includes(Number(t.id))?'checked':''}><span>Tavolo ${esc(t.code)} · ${Number(t.min_seats||1)}–${Number(t.seats)} posti</span></label>`).join(''):`<p>Nessun tavolo libero con capienza adatta a ${Number.isInteger(party)&&party>0?party:'questo numero di'} persone in questa sala.</p>`;update()};
-  const load=async()=>{const version=++loadVersion;loading=true;submit.disabled=true;list.textContent='Verifica disponibilità…';try{const data=await api('admin/operations?date='+encodeURIComponent(form.elements.date.value)+'&service='+encodeURIComponent(form.elements.service.value));if(version!==loadVersion||!layer.isConnected)return;const busy=new Set(data.reservations.filter(r=>r.status==='confirmed'&&Number(r.id)!==Number(editing.id)).flatMap(r=>String(r.table_ids||'').split(',').filter(Boolean).map(Number)));const blocks=data.blocks;const rooms=data.rooms.filter(r=>Number(r.internal_enabled)&&!blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===Number(r.id))));const prev=room.value||String(editing.room_id);freeTables=data.tables.filter(t=>Number(t.enabled)&&rooms.some(r=>Number(r.id)===Number(t.room_id))&&!busy.has(Number(t.id))&&!blocks.some(b=>b.scope==='table'&&Number(b.target_id)===Number(t.id)));available=freeTables.filter(fitsParty);room.innerHTML=rooms.map(r=>`<option value="${Number(r.id)}">${esc(r.name)}</option>`).join('');if(rooms.some(r=>String(r.id)===prev))room.value=prev;selectedTables=selectedTables.filter(id=>available.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(room.value)));loading=false;paint()}catch(e){if(version!==loadVersion)return;available=[];freeTables=[];loading=false;list.textContent=e.message;update()}};
+  const load=async()=>{const version=++loadVersion;loading=true;submit.disabled=true;list.textContent='Verifica disponibilità…';try{const data=await api('admin/operations?date='+encodeURIComponent(form.elements.date.value)+'&service='+encodeURIComponent(form.elements.service.value));if(version!==loadVersion||!layer.isConnected)return;const busy=new Set(data.reservations.filter(r=>r.status==='confirmed'&&Number(r.id)!==Number(editing.id)).flatMap(r=>String(r.table_ids||'').split(',').filter(Boolean).map(Number)));const blocks=data.blocks;tableLinks=data.links||[];const rooms=data.rooms.filter(r=>Number(r.internal_enabled)&&!blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===Number(r.id))));const prev=room.value||String(editing.room_id);freeTables=data.tables.filter(t=>Number(t.enabled)&&rooms.some(r=>Number(r.id)===Number(t.room_id))&&!busy.has(Number(t.id))&&!blocks.some(b=>b.scope==='table'&&Number(b.target_id)===Number(t.id)));available=freeTables.filter(fitsParty);room.innerHTML=rooms.map(r=>`<option value="${Number(r.id)}">${esc(r.name)}</option>`).join('');if(rooms.some(r=>String(r.id)===prev))room.value=prev;selectedTables=selectedTables.filter(id=>available.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(room.value)));loading=false;paint()}catch(e){if(version!==loadVersion)return;available=[];freeTables=[];loading=false;list.textContent=e.message;update()}};
   form.querySelector('#oasi-edit-recommend').onclick=()=>{
    if(loading)return;
    const party=Number(form.elements.party_size.value),pool=available.filter(t=>Number(t.room_id)===Number(room.value));
-   let suggested=oasiRecommendStaffTables(pool,party);
+   let suggested=oasiRecommendStaffTables(pool,party,tableLinks);
    if(!suggested.length){
-    const acrossRooms=oasiRecommendStaffTables(available,party);
+    const acrossRooms=oasiRecommendStaffTables(available,party,tableLinks);
     if(acrossRooms.length){
      const target=available.find(t=>Number(t.id)===Number(acrossRooms[0]));
      if(target){room.value=String(target.room_id);suggested=acrossRooms;}
@@ -954,7 +980,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
   const roomBlocked=!(d.rooms||[]).find(r=>Number(r.id)===Number(table.room_id))?.internal_enabled||(d.blocks||[]).some(b=>(b.scope==='room'&&Number(b.target_id)===Number(table.room_id))||b.scope==='service');
   const taken=new Set((d.reservations||[]).filter(r=>r.status==='confirmed'&&r.service===state.opsService).flatMap(r=>String(r.table_ids||'').split(',').map(Number)));
   const forbidden=new Set((d.blocks||[]).filter(b=>b.scope==='table').map(b=>Number(b.target_id)));
-  const additional=(d.tables||[]).filter(t=>Number(t.room_id)===Number(table.room_id)&&Number(t.id)!==id&&t.enabled&&!taken.has(Number(t.id))&&!forbidden.has(Number(t.id))).sort((a,b)=>String(a.code).localeCompare(String(b.code),'it',{numeric:true}));
+  const additional=(d.tables||[]).filter(t=>Number(t.room_id)===Number(table.room_id)&&Number(t.id)!==id&&t.enabled&&!taken.has(Number(t.id))&&!forbidden.has(Number(t.id))&&oasiConnectedTableIds([id,Number(t.id)],d.links||[])).sort((a,b)=>String(a.code).localeCompare(String(b.code),'it',{numeric:true}));
   const bookIds=booking?String(booking.table_ids||'').split(',').map(Number).filter(Boolean):[];
   document.querySelector('.op-drawer-layer')?.remove();
   const wrap=document.createElement('div');wrap.className='op-drawer-layer';
@@ -964,7 +990,7 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
    <label class="op-state-label">Stato servizio ${opSelect(booking)}</label>
    ${oasiWhatsAppHref(booking.phone,booking.name,state.date,booking.time)?`<a class="mini customer-wa" target="_blank" rel="noopener noreferrer" href="${esc(oasiWhatsAppHref(booking.phone,booking.name,state.date,booking.time))}">Contatta su WhatsApp</a>`:''}<button type="button" class="mini" id="op-open-agenda">Apri in Prenotazioni</button>`:
   `<p class="op-drawer-help">${!table.enabled?'Questo tavolo è disattivato nella piantina standard.':blocking?'Tavolo non disponibile per questo servizio.':roomBlocked?'La sala o il servizio è bloccato.':'Questo tavolo è libero per il servizio selezionato.'}</p>
-   ${table.enabled&&!blocking&&!roomBlocked?`<form id="op-new-reservation" class="op-drawer-form"><label>Cliente<input name="name" maxlength="120" required placeholder="Nome e cognome"></label><label>Telefono<input name="phone" type="tel" required placeholder="Numero di telefono"></label><label>Ora di arrivo<input type="time" name="time" value="${state.opsService==='lunch'?'12:30':'19:30'}" required></label><label>Persone<input name="party_size" type="number" min="1" max="200" value="${Math.min(Number(table.seats),Math.max(2,Number(table.min_seats||1)))}" required></label><div class="op-multi-group"><div class="op-multi-heading"><strong>Tavoli della prenotazione</strong><small>Puoi unire più tavoli liberi della stessa sala</small></div><label class="op-multi-option"><input type="checkbox" data-combine-table="${id}" checked disabled><span><strong>Tavolo ${esc(table.code)}</strong><small>${Number(table.min_seats||1)}–${Number(table.seats)} posti · selezionato</small></span></label>${additional.map(t=>`<label class="op-multi-option"><input type="checkbox" data-combine-table="${Number(t.id)}"><span><strong>Tavolo ${esc(t.code)}</strong><small>${Number(t.min_seats||1)}–${Number(t.seats)} posti</small></span></label>`).join('')}<div class="op-multi-capacity" id="op-multi-capacity" role="status" aria-live="polite"></div><p class="op-multi-hint">L’unione vale soltanto per questa prenotazione: la piantina standard non cambia. Tutti i tavoli restano riservati fino alla fine del servizio.</p></div><label>Email obbligatoria<input type="email" name="email" required></label><label>Note<textarea name="notes" rows="3"></textarea></label><p class="op-drawer-help">Prenotazione unica sul tavolo o sui tavoli selezionati. I gruppi da 10 persone in su possono essere inseriti solo dal personale.</p><button type="submit" class="btn btn-dark">Conferma prenotazione</button></form>`:''}
+   ${table.enabled&&!blocking&&!roomBlocked?`<form id="op-new-reservation" class="op-drawer-form"><label>Cliente<input name="name" maxlength="120" required placeholder="Nome e cognome"></label><label>Telefono<input name="phone" type="tel" required placeholder="Numero di telefono"></label><label>Ora di arrivo<input type="time" name="time" value="${state.opsService==='lunch'?'12:30':'19:30'}" required></label><label>Persone<input name="party_size" type="number" min="1" max="200" value="${Math.min(Number(table.seats),Math.max(2,Number(table.min_seats||1)))}" required></label><div class="op-multi-group"><div class="op-multi-heading"><strong>Tavoli della prenotazione</strong><small>Puoi unire solo i tavoli adiacenti collegati nella piantina</small></div><label class="op-multi-option"><input type="checkbox" data-combine-table="${id}" checked disabled><span><strong>Tavolo ${esc(table.code)}</strong><small>${Number(table.min_seats||1)}–${Number(table.seats)} posti · selezionato</small></span></label>${additional.map(t=>`<label class="op-multi-option"><input type="checkbox" data-combine-table="${Number(t.id)}"><span><strong>Tavolo ${esc(t.code)}</strong><small>${Number(t.min_seats||1)}–${Number(t.seats)} posti</small></span></label>`).join('')}<div class="op-multi-capacity" id="op-multi-capacity" role="status" aria-live="polite"></div><p class="op-multi-hint">L’unione vale soltanto per questa prenotazione: la piantina standard non cambia. Tutti i tavoli restano riservati fino alla fine del servizio.</p></div><label>Email obbligatoria<input type="email" name="email" required></label><label>Note<textarea name="notes" rows="3"></textarea></label><p class="op-drawer-help">Prenotazione unica sul tavolo o sui tavoli selezionati. I gruppi da 10 persone in su possono essere inseriti solo dal personale.</p><button type="submit" class="btn btn-dark">Conferma prenotazione</button></form>`:''}
    ${blocking?'<button type="button" class="btn btn-outline" id="op-unblock-table">Rendi disponibile</button>':!booking&&!roomBlocked&&table.enabled?'<button type="button" class="btn btn-outline" id="op-block-table">Imposta non disponibile</button>':''}`;
   wrap.innerHTML=`<button type="button" class="op-drawer-scrim" aria-label="Chiudi pannello"></button><aside class="op-drawer" role="dialog" aria-modal="true" aria-label="Gestione tavolo ${esc(table.code)}"><div class="op-drawer-top"><div><span class="eyebrow">GESTIONE SERVIZIO</span><h2>Tavolo ${esc(table.code)}</h2><p>${Number(table.min_seats||1)}–${Number(table.seats)} posti · ${esc(opServiceLabel(state.opsService))} · ${esc(state.date)}</p></div><button type="button" class="op-drawer-close" aria-label="Chiudi">×</button></div>${details}</aside>`;
   document.body.append(wrap);document.body.classList.add('op-drawer-open');
@@ -979,14 +1005,14 @@ $('#menu-pdf-form')?.addEventListener('submit',async e=>{e.preventDefault();cons
    const capacityNode=wrap.querySelector('#op-multi-capacity');
    const updateCapacity=()=>{
     const chosen=selectedTables();const min=chosen.reduce((n,t)=>n+Number(t.min_seats||1),0),max=chosen.reduce((n,t)=>n+Number(t.seats||0),0);
-    const count=Number(partyField.value);const valid=Number.isInteger(count)&&count>=min&&count<=max;
-    capacityNode.innerHTML=`<strong>${chosen.length} ${chosen.length===1?'tavolo':'tavoli'} · ${min}–${max} posti</strong><span>${valid?'Capienza compatibile':`Inserisci un numero di ospiti tra ${min} e ${max}`}</span>`;
+    const count=Number(partyField.value);const connected=oasiConnectedTableIds(chosen.map(t=>Number(t.id)),d.links||[]);const valid=Number.isInteger(count)&&count>=min&&count<=max&&connected;
+    capacityNode.innerHTML=`<strong>${chosen.length} ${chosen.length===1?'tavolo':'tavoli'} · ${min}–${max} posti</strong><span>${!connected?'I tavoli selezionati non formano una combinazione collegata':valid?'Capienza compatibile':`Inserisci un numero di ospiti tra ${min} e ${max}`}</span>`;
     capacityNode.classList.toggle('invalid',!valid);creationForm.querySelector('[type="submit"]').disabled=!valid||chosen.length>8;
     return {chosen,min,max,valid};
    };
    creationForm.querySelectorAll('[data-combine-table]').forEach(x=>x.addEventListener('change',updateCapacity));
    partyField.addEventListener('input',updateCapacity);updateCapacity();
-   creationForm.addEventListener('submit',e=>{e.preventDefault();const check=updateCapacity();if(!check.valid)return msg('Numero ospiti incompatibile con i tavoli selezionati','error');
+   creationForm.addEventListener('submit',e=>{e.preventDefault();const check=updateCapacity();if(!check.valid)return msg('Capienza incompatibile oppure tavoli non adiacenti','error');
     const submit=creationForm.querySelector('[type="submit"]');submit.disabled=true;
     const payload={...inputData(creationForm),date:state.date,service:state.opsService,room_id:Number(table.room_id),table_ids:check.chosen.map(t=>Number(t.id))};
     execute(async()=>{const saved=await api('admin/reservations','POST',payload);if(!saved.id)throw Error('Il server non ha confermato la prenotazione');msg('Prenotazione unica su '+check.chosen.map(t=>t.code).join(' + '))}).finally(()=>{if(submit.isConnected)updateCapacity()});
