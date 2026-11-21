@@ -122,7 +122,7 @@ const oasiWhatsAppHref=(phone,name,date='',time='')=>{const number=oasiWhatsAppN
 function customerAutocomplete(form){
  if(!form||form.dataset.customerLookup==='yes')return;
  const phone=form.querySelector('[name="phone"]'),email=form.querySelector('[name="email"]'),name=form.querySelector('[name="name"]');if(!phone||!email||!name)return;
- form.dataset.customerLookup='yes';const suggestion=document.createElement('div');suggestion.className='customer-autocomplete';suggestion.setAttribute('aria-live','polite');email.closest('label')?.insertAdjacentElement('afterend',suggestion);
+ form.dataset.customerLookup='yes';const suggestion=document.createElement('div');suggestion.className='customer-autocomplete';suggestion.setAttribute('aria-live','polite');(form.id==='oasi-booking-drawer-form'?phone:email).closest('label')?.insertAdjacentElement('afterend',suggestion);
  let seq=0,timer;
  const find=()=>{clearTimeout(timer);const thisSeq=++seq;const p=phone.value.trim(),m=email.value.trim();suggestion.replaceChildren();if((p.replace(/\D/g,'').length<9)&&(!m.includes('@')))return;
   timer=setTimeout(async()=>{try{const results=await api('admin/customers?lookup=1&phone='+encodeURIComponent(p)+'&email='+encodeURIComponent(m));if(thisSeq!==seq||!form.isConnected)return;
