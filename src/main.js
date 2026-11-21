@@ -396,7 +396,7 @@ const oasiAgendaGroup=(reservations,service)=>{
  return `<section class="oasi-agenda-group" aria-label="Prenotazioni ${name}">
   <header class="oasi-agenda-group-heading"><div><span class="eyebrow">${service==='lunch'?'SERVIZIO DIURNO':'SERVIZIO SERALE'}</span><h3>${name}</h3></div><p><strong>${confirmed.length}</strong> prenotazioni · <strong>${covers}</strong> coperti</p></header>
   <div class="oasi-agenda-entries">${rows.length?rows.map(r=>{
-   const active=r.status==='confirmed',phone=String(r.phone||'').replace(/[^+0-9]/g,''),visit=r.visit_state||'expected';const nextStep=oasiVisitNext[visit];
+   const active=r.status==='confirmed',phone=String(r.phone||'').replace(/[^+0-9]/g,''),visit=r.visit_state||'expected';const nextStep={expected:['arrived','Segna arrivato'],arrived:['finished','Termina servizio'],seated:['finished','Termina servizio']}[visit];
    return `<article class="oasi-agenda-entry ${active?'':'is-cancelled'}" data-agenda-search="${esc([r.name,r.phone,r.table_codes,r.notes,r.time,r.source==='staff_banquet'?'banchetto':''].join(' ').toLocaleLowerCase('it-IT'))}">
       <div class="oasi-agenda-entry-time"><time>${esc(r.time||'—')}</time><span class="oasi-agenda-entry-source">${r.source==='web'?'Online':r.source==='staff_banquet'?'Banchetto':'Staff'}</span></div>
       <div class="oasi-agenda-entry-details"><h4>${esc(r.name)}</h4>${r.source==='staff_banquet'?'<span class="oasi-banquet-tag">Banchetto · sala condivisa</span>':''}<p><strong>${Number(r.party_size)}</strong> ${Number(r.party_size)===1?'persona':'persone'} · ${esc(r.table_codes||'Tavolo da assegnare')}</p>${r.notes?`<p class="oasi-agenda-entry-note">${esc(r.notes)}</p>`:''}</div>
