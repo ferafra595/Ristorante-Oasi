@@ -756,6 +756,38 @@ function bindEvents(){
  document.querySelector('#event-filter')?.addEventListener('submit',e=>{e.preventDefault();const data=new FormData(e.target);state.eventRange={start:String(data.get('start')||''),end:String(data.get('end')||'')};renderAdmin()});
  document.querySelector('#event-all')?.addEventListener('click',()=>{state.eventRange={start:'',end:''};renderAdmin()});
 }
+// Consiglio operativo, solo per il personale: non prenota e non modifica la piantina.
+const oasiRecommendStaffTables=(tables,party)=>{
+ if(!Number.isSafeInteger(party)||party<1||party>200)return [];
+ const rooms=new Map();
+ for(const t of tables){
+  const id=Number(t.id),room=Number(t.room_id),min=Number(t.min_seats||1),max=Number(t.seats);
+  if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(room)||!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min||min>party)continue;
+  if(!rooms.has(room))rooms.set(room,[]);
+  rooms.get(room).push({id,min,max});
+ }
+ let best=null,bestScore=null;
+ for(const [room,arr] of rooms){
+  const dp=new Map([['0:0:0',{ids:[],min:0,max:0}]]);
+  for(const t of arr.slice(0,40)){
+   for(const prev of [...dp.values()]){
+    if(prev.ids.length>=8)continue;
+    const next={ids:[...prev.ids,t.id],min:prev.min+t.min,max:prev.max+t.max};
+    if(next.min>party)continue;
+    const key=next.ids.length+':'+next.min+':'+next.max;
+    if(!dp.has(key))dp.set(key,next);
+   }
+  }
+  for(const option of dp.values()){
+   if(!option.ids.length||option.min>party||option.max<party)continue;
+   const score=[option.ids.length,option.max-party,party-option.min,room,...option.ids];
+   if(!bestScore||score.some((n,i)=>n!==bestScore[i]&&score.slice(0,i).every((v,j)=>v===bestScore[j)&&n<bestScore[i])){
+    bestScore=score;best=option;
+   }
+  }
+ }
+ return best?best.ids:[];
+};
 function openEditBookingDrawer(row){if(row)openNewBookingDrawer(null,row)}
 function openNewBookingDrawer(_event=null,editing=null){
  // One drawer for the ADMIN agenda and the global quick-create shortcut.
@@ -772,7 +804,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="Numero di telefono"></label>
    <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
    <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
-   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p></section>`}
+   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p></section>`}
    <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
    <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
    <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">${editing?'Salva modifiche':'Registra prenotazione'}</button></footer>
@@ -813,6 +845,20 @@ function openNewBookingDrawer(_event=null,editing=null){
   const refreshCapacity=()=>{available=freeTables.filter(fitsParty);selectedTables=selectedTables.filter(id=>available.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(room.value)));paint()};
   const paint=()=>{const tables=available.filter(t=>Number(t.room_id)===Number(room.value));const party=Number(form.elements.party_size.value);list.innerHTML=tables.length?tables.map(t=>`<label class="oasi-edit-table"><input type="checkbox" value="${Number(t.id)}" ${selectedTables.includes(Number(t.id))?'checked':''}><span>Tavolo ${esc(t.code)} · ${Number(t.min_seats||1)}–${Number(t.seats)} posti</span></label>`).join(''):`<p>Nessun tavolo libero con capienza adatta a ${Number.isInteger(party)&&party>0?party:'questo numero di'} persone in questa sala.</p>`;update()};
   const load=async()=>{const version=++loadVersion;loading=true;submit.disabled=true;list.textContent='Verifica disponibilità…';try{const data=await api('admin/operations?date='+encodeURIComponent(form.elements.date.value)+'&service='+encodeURIComponent(form.elements.service.value));if(version!==loadVersion||!layer.isConnected)return;const busy=new Set(data.reservations.filter(r=>r.status==='confirmed'&&Number(r.id)!==Number(editing.id)).flatMap(r=>String(r.table_ids||'').split(',').filter(Boolean).map(Number)));const blocks=data.blocks;const rooms=data.rooms.filter(r=>Number(r.internal_enabled)&&!blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===Number(r.id))));const prev=room.value||String(editing.room_id);freeTables=data.tables.filter(t=>Number(t.enabled)&&rooms.some(r=>Number(r.id)===Number(t.room_id))&&!busy.has(Number(t.id))&&!blocks.some(b=>b.scope==='table'&&Number(b.target_id)===Number(t.id)));available=freeTables.filter(fitsParty);room.innerHTML=rooms.map(r=>`<option value="${Number(r.id)}">${esc(r.name)}</option>`).join('');if(rooms.some(r=>String(r.id)===prev))room.value=prev;selectedTables=selectedTables.filter(id=>available.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(room.value)));loading=false;paint()}catch(e){if(version!==loadVersion)return;available=[];freeTables=[];loading=false;list.textContent=e.message;update()}};
+  form.querySelector('#oasi-edit-recommend').onclick=()=>{
+   if(loading)return;
+   const party=Number(form.elements.party_size.value),pool=available.filter(t=>Number(t.room_id)===Number(room.value));
+   let suggested=oasiRecommendStaffTables(pool,party);
+   if(!suggested.length){
+    const acrossRooms=oasiRecommendStaffTables(available,party);
+    if(acrossRooms.length){
+     const target=available.find(t=>Number(t.id)===Number(acrossRooms[0]));
+     if(target){room.value=String(target.room_id);suggested=acrossRooms;}
+    }
+   }
+   if(!suggested.length){msg('Nessuna combinazione compatibile: modifica il numero di ospiti o verifica le disponibilità.','error');return}
+   selectedTables=suggested;paint();msg('Combinazione proposta. Controlla e salva per confermare.');
+  };
   room.onchange=()=>{selectedTables=[];paint()};list.onchange=e=>{if(e.target.type!=='checkbox')return;const id=Number(e.target.value);selectedTables=e.target.checked?[...selectedTables,id]:selectedTables.filter(x=>x!==id);update()};form.elements.party_size.addEventListener('input',refreshCapacity);form.elements.date.addEventListener('change',load);serviceInput.addEventListener('change',load);form.querySelector('#oasi-edit-refresh').onclick=load;load();
  }
  if(!editing){
