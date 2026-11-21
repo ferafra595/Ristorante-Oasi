@@ -123,13 +123,28 @@ async function candidates(db,roomIds,date,service,party){
  if(!free.length)return options;
  const allLinks=(await db.prepare('SELECT table_a,table_b FROM table_links').all()).results;
  const byId=new Map(free.map(t=>[t.id,t]));const adj=new Map(free.map(t=>[t.id,[]]));
- for(const link of allLinks){const a=byId.get(link.table_a),b=byId.get(link.table_b);if(a&&b&&a.room_id===b.room_id){adj.get(a.id).push(b.id);adj.get(b.id).push(a.id)}}
+ for(const link of allLinks){const a=byId.get(link.table_a),b=byId.get(link.table_b);if(a&&b&&a.room_id===b.room_id&&oasiVerticalPair(a,b)){adj.get(a.id).push(b.id);adj.get(b.id).push(a.id)}}
  const seen=new Set();let explored=0;
  for(const root of free){const queue=[[root.id]];while(queue.length&&explored<25000){explored++;const group=queue.shift();if(group.length>=8)continue;const next=new Set(group.flatMap(id=>adj.get(id)||[]));for(const id of next){if(group.includes(id))continue;const ids=[...group,id].sort((a,b)=>a-b);const key=ids.join('-');if(seen.has(key))continue;seen.add(key);const members=ids.map(i=>byId.get(i));const capacity=members.reduce((s,t)=>s+t.seats,0),minimum=members.reduce((s,t)=>s+Number(t.min_seats||1),0);if(capacity>=party&&minimum<=party)options.push({ids,room_id:root.room_id,capacity,code:members.map(t=>t.code).join('+')});if(ids.length<8)queue.push(ids)}}}
  return rankTableOptions(options,party);
 }
 // Una combinazione di tavoli è valida solo se forma una rete connessa
 // di collegamenti esplicitamente definiti nella piantina standard.
+// Collegamenti per il servizio: solo tavoli allineati verticalmente,
+// abbastanza vicini da essere fisicamente accostati. I tavoli non si spostano.
+const oasiVerticalPair=(a,b)=>{
+ const fields=[a.x,a.y,a.w,a.h,b.x,b.y,b.w,b.h].map(Number);
+ if(!fields.every(Number.isFinite)||fields[2]<=0||fields[3]<=0||fields[6]<=0||fields[7]<=0)return false;
+ const [ax,ay,aw,ah,bx,by,bw,bh]=fields;
+ const cx=ax+aw/2,dx=bx+bw/2;
+ const horizontalOverlap=Math.min(ax+aw,bx+bw)-Math.max(ax,bx);
+ const gap=Math.max(0,ay-(by+bh),by-(ay+ah));
+ const overlapY=Math.min(ay+ah,by+bh)-Math.max(ay,by);
+ return Math.abs(cx-dx)<=Math.max(28,Math.min(aw,bw)*0.45)
+  &&horizontalOverlap>=Math.min(aw,bw)*0.45
+  &&overlapY<=0&&gap<=90
+  &&Math.abs((ay+ah/2)-(by+bh/2))>=Math.min(ah,bh)*0.55;
+};
 function oasiConnectedTableIds(ids,links){
  if(ids.length<=1)return true;
  const allowed=new Set(ids.map(Number)),visited=new Set([Number(ids[0])]);
@@ -148,7 +163,11 @@ function oasiConnectedTableIds(ids,links){
 async function oasiLinkedTables(db,ids){
  if(ids.length<2)return true;
  const links=(await db.prepare('SELECT table_a,table_b FROM table_links').all()).results||[];
- return oasiConnectedTableIds(ids,links);
+ const rows=(await db.prepare('SELECT id,x,y,w,h,room_id FROM tables WHERE id IN ('+ids.map(()=>'?').join(',')+')').bind(...ids).all()).results||[];
+ if(rows.length!==ids.length)return false;
+ const byId=new Map(rows.map(r=>[Number(r.id),r]));
+ const valid=links.filter(l=>{const a=byId.get(Number(l.table_a)),b=byId.get(Number(l.table_b));return a&&b&&Number(a.room_id)===Number(b.room_id)&&oasiVerticalPair(a,b)});
+ return oasiConnectedTableIds(ids,valid);
 }
 // Staff-only choice: a temporary group of free tables in the same room.
 // Does NOT modify the standard floor plan or allow public customers to bypass linked-table rules.
@@ -239,7 +258,7 @@ async function manualTableUnavailableReason(db,roomIds,date,service,party,select
  const occupied=await db.prepare(`SELECT DISTINCT t.code FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id
  WHERE rt.book_date=? AND rt.service=? AND rt.reservation_id<>? AND rt.table_id IN (${marks})`).bind(date,service,excludeId,...ids).all();
  if(occupied.results?.length)return `Tavolo ${occupied.results.map(t=>t.code).join(', ')} già prenotato per il ${when}.`;
- if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti non sono collegabili nella piantina. Seleziona tavoli adiacenti, collegati tra loro.';
+ if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti devono essere collegati in verticale e senza interruzioni. Seleziona una colonna di tavoli accostabili.';
  const max=tables.reduce((n,t)=>n+Number(t.seats),0),min=tables.reduce((n,t)=>n+Number(t.min_seats),0);
  if(party>max||party<min)return `Capienza non compatibile: i tavoli selezionati accolgono da ${min} a ${max} persone, mentre la prenotazione è per ${party}.`;
  return `Impossibile assegnare i tavoli scelti per il ${when}. Aggiorna la piantina e riprova.`;
@@ -523,9 +542,9 @@ if(['table-links','room-zones'].includes(resource)){
    if(method==='GET')return json((await db.prepare('SELECT * FROM table_links ORDER BY table_a,table_b').all()).results);
    const a=Number(b.table_a),z=Number(b.table_b);const one=Math.min(a,z),two=Math.max(a,z);
    if(!Number.isInteger(one)||!Number.isInteger(two)||one===two||one<=0)return fail('Seleziona due tavoli diversi');
-   const rows=(await db.prepare('SELECT id,room_id FROM tables WHERE id IN (?,?)').bind(one,two).all()).results;
+   const rows=(await db.prepare('SELECT id,room_id,x,y,w,h FROM tables WHERE id IN (?,?)').bind(one,two).all()).results;
    if(rows.length!==2||rows[0].room_id!==rows[1].room_id)return fail('I tavoli devono appartenere alla stessa sala');
-   if(method==='POST'){await db.prepare('INSERT OR IGNORE INTO table_links(table_a,table_b) VALUES(?,?)').bind(one,two).run();return json({ok:true})}
+   if(method==='POST'){if(!oasiVerticalPair(rows[0],rows[1]))return fail('Puoi collegare solo tavoli allineati verticalmente e abbastanza vicini. Controlla la disposizione nella piantina.',409);await db.prepare('INSERT OR IGNORE INTO table_links(table_a,table_b) VALUES(?,?)').bind(one,two).run();return json({ok:true})}
    if(method==='DELETE'){await db.prepare('DELETE FROM table_links WHERE table_a=? AND table_b=?').bind(one,two).run();return json({ok:true})}
  }
  if(resource==='room-zones'){
