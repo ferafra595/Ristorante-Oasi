@@ -54,8 +54,8 @@ test('Agenda separates lunch and dinner, calculates confirmed covers, and keeps 
 });
 test('Agenda retains filters, clear Today action and optional print tools',()=>{
  assert.ok(source.includes("state.reservationService='all';state.agendaManualSelection=false"));
- assert.ok(source.includes('oasiAgendaGroup(arr,\\'lunch\\')'));
- assert.ok(source.includes('oasiAgendaGroup(arr,\\'dinner\\')'));
+ assert.ok(source.includes("oasiAgendaGroup(arr,'lunch')"));
+ assert.ok(source.includes("oasiAgendaGroup(arr,'dinner')"));
  assert.ok(source.includes('id="reservation-service"'));
  assert.ok(source.includes('id="print-reservations"'));
  assert.ok(source.includes("if(oasiAutoServiceRefresh()){await renderAdmin();return}"));
