@@ -607,7 +607,7 @@ function printOasiReservations(mode='plan'){
    const gap=bottom.y-(top.y+top.h);
    if(gap<0||gap>90)return [];
    const left=Math.max(top.x,bottom.x),right=Math.min(top.x+top.w,bottom.x+bottom.w);
-   const center=(left+right)/2,barWidth=Math.min(24,Math.max(12,(right-left)*.42));
+   const center=(left+right)/2,barWidth=Math.max(12,(right-left)*.86);
    return ['<rect class="print-joined-bridge" x="'+(center-barWidth/2)+'" y="'+(top.y+top.h-3)+'" width="'+barWidth+'" height="'+(gap+6)+'" rx="3" fill="#d2e6d5" stroke="#396849" stroke-width="2.2"/>'];
   }).join('');
   const clipId='room-clip-'+room.id;
