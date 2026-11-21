@@ -1615,3 +1615,9 @@ body.oasi-booking-drawer-open{overflow:hidden}
 .oasi-agenda-next{background:#e9f2e9!important;border-color:#bad3bc!important;color:#234c2b!important;font-weight:700!important}
 @media(max-width:640px){.oasi-agenda-search{padding:13px;gap:8px}.oasi-agenda-search label{width:100%}.oasi-agenda-search input{flex-basis:100%}.oasi-agenda-search-count{margin-left:0}.oasi-agenda-next{width:100%}}
 @media print{.oasi-agenda-search,.oasi-agenda-next{display:none!important}}
+
+/* Modifica prenotazioni: azioni compatte per assegnare tavoli */
+.oasi-edit-recommend-tools{display:flex;flex-wrap:wrap;gap:9px;margin:10px 0}
+.oasi-edit-recommend-tools .mini{flex:1 1 160px;min-height:42px}
+#oasi-edit-recommend{background:#eaf0e8;border-color:#bfd0ba;color:#294b2e;font-weight:700}
+@media(max-width:600px){.oasi-edit-recommend-tools{flex-direction:column}.oasi-edit-recommend-tools .mini{width:100%;flex:auto}}
