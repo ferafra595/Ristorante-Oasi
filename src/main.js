@@ -716,10 +716,10 @@ function openNewBookingDrawer(_event=null,editing=null){
   <form id="oasi-booking-drawer-form" class="oasi-booking-drawer-form">
    <div class="oasi-booking-drawer-fields"><div class="oasi-booking-drawer-pair"><label>Data *<input name="date" type="date" value="${esc(state.date)}" required></label><label>Servizio *<select name="service"><option value="lunch" ${startService==='lunch'?'selected':''}>Pranzo</option><option value="dinner" ${startService==='dinner'?'selected':''}>Cena</option></select></label></div>
    <div class="oasi-booking-drawer-pair"><label>Ora di arrivo *<input name="time" type="time" required value="${startService==='lunch'?'12:30':'19:30'}"></label><label>Persone *<input name="party_size" type="number" min="1" max="200" required value="2"></label></div>
+   <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="Numero di telefono"></label>
    <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
-   <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" placeholder="Numero di telefono"></label>
    <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
-   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:''}
+   ${editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p></section>`}
    <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
    <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
    <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">${editing?'Salva modifiche':'Registra prenotazione'}</button></footer>
@@ -762,6 +762,34 @@ function openNewBookingDrawer(_event=null,editing=null){
   const load=async()=>{const version=++loadVersion;loading=true;submit.disabled=true;list.textContent='Verifica disponibilità…';try{const data=await api('admin/operations?date='+encodeURIComponent(form.elements.date.value)+'&service='+encodeURIComponent(form.elements.service.value));if(version!==loadVersion||!layer.isConnected)return;const busy=new Set(data.reservations.filter(r=>r.status==='confirmed'&&Number(r.id)!==Number(editing.id)).flatMap(r=>String(r.table_ids||'').split(',').filter(Boolean).map(Number)));const blocks=data.blocks;const rooms=data.rooms.filter(r=>Number(r.internal_enabled)&&!blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===Number(r.id))));const prev=room.value||String(editing.room_id);freeTables=data.tables.filter(t=>Number(t.enabled)&&rooms.some(r=>Number(r.id)===Number(t.room_id))&&!busy.has(Number(t.id))&&!blocks.some(b=>b.scope==='table'&&Number(b.target_id)===Number(t.id)));available=freeTables.filter(fitsParty);room.innerHTML=rooms.map(r=>`<option value="${Number(r.id)}">${esc(r.name)}</option>`).join('');if(rooms.some(r=>String(r.id)===prev))room.value=prev;selectedTables=selectedTables.filter(id=>available.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(room.value)));loading=false;paint()}catch(e){if(version!==loadVersion)return;available=[];freeTables=[];loading=false;list.textContent=e.message;update()}};
   room.onchange=()=>{selectedTables=[];paint()};list.onchange=e=>{if(e.target.type!=='checkbox')return;const id=Number(e.target.value);selectedTables=e.target.checked?[...selectedTables,id]:selectedTables.filter(x=>x!==id);update()};form.elements.party_size.addEventListener('input',refreshCapacity);form.elements.date.addEventListener('change',load);serviceInput.addEventListener('change',load);form.querySelector('#oasi-edit-refresh').onclick=load;load();
  }
+ if(!editing){
+  const suggestionSelect=form.elements.suggested_table,hint=form.querySelector('#oasi-suggestion-hint');
+  let suggestionVersion=0,suggestedOptions=[],suggestionTimer;
+  const refreshSuggestions=async()=>{
+   const version=++suggestionVersion;
+   suggestionSelect.replaceChildren(new Option('Automatica · miglior tavolo disponibile',''));
+   suggestedOptions=[];
+   const date=form.elements.date.value,service=form.elements.service.value,party=Number(form.elements.party_size.value);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(party)||party<1||party>200){hint.textContent='Seleziona una data e un numero di persone validi.';return}
+   hint.textContent='Verifica tavoli disponibili…';
+   try{
+    const q=new URLSearchParams({date,service,party_size:String(party)});
+    const result=await api('admin/suggestions?'+q);
+    if(version!==suggestionVersion||!layer.isConnected)return;
+    suggestedOptions=result.options||[];
+    suggestedOptions.forEach((o,i)=>suggestionSelect.add(new Option((i===0?'Consigliato · ':'')+'Tavolo '+o.code+' · '+o.room_name+' · '+o.capacity+' posti',String(i))));
+    hint.textContent=suggestedOptions.length?'Consigliato: tavolo '+suggestedOptions[0].code+' ('+suggestedOptions[0].room_name+'). Puoi confermare la scelta automatica o indicare un tavolo.':'Nessun tavolo compatibile disponibile per il servizio selezionato.';
+   }catch(e){if(version===suggestionVersion){hint.textContent='Suggerimenti non disponibili: il salvataggio verificherà comunque i tavoli.'}}
+  };
+  const scheduleSuggestions=()=>{clearTimeout(suggestionTimer);suggestionSelect.replaceChildren(new Option('Automatica · miglior tavolo disponibile',''));suggestedOptions=[];hint.textContent='Aggiornamento disponibilità…';suggestionTimer=setTimeout(refreshSuggestions,220)};
+  form.elements.date.addEventListener('change',scheduleSuggestions);
+  form.elements.service.addEventListener('change',scheduleSuggestions);
+  form.elements.party_size.addEventListener('input',scheduleSuggestions);
+  form.dataset.suggestedSelection='automatic';
+  suggestionSelect.addEventListener('change',()=>{form.dataset.suggestedSelection=suggestionSelect.value===''?'automatic':'manual'});
+  form._oasiSelectedRecommendation=()=>suggestionSelect.value===''?null:suggestedOptions[Number(suggestionSelect.value)]||null;
+  refreshSuggestions();
+ }
  customerAutocomplete(form);
  form.addEventListener('submit',async e=>{
   e.preventDefault();if(saving||submit.disabled)return;
@@ -769,6 +797,7 @@ function openNewBookingDrawer(_event=null,editing=null){
   let created=null;
   try{
    const payload=inputData(form);
+   if(!editing){delete payload.suggested_table;const selection=form._oasiSelectedRecommendation?.();if(selection){payload.room_id=selection.room_id;payload.table_ids=selection.table_ids}}
    created=editing?await api('admin/reservations/'+editing.id,'PATCH',{...payload,action:'edit_full',table_ids:selectedTables,expected}):await api('admin/reservations','POST',payload);
    state.date=payload.date;state.reservationService=payload.service;if(editing){state.adminView='reservations';}
    const savedRows=await api('admin/reservations?date='+encodeURIComponent(payload.date)+'&service='+encodeURIComponent(payload.service));
@@ -781,7 +810,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    msg(err.message,'error');saving=false;submit.disabled=editing&&(loading||!selectedTables.length);submit.textContent=editing?'Salva modifiche':'Registra prenotazione';
   }
  });
- requestAnimationFrame(()=>{if(matchMedia('(max-width:900px)').matches)panel.focus({preventScroll:true});else form.elements.name?.focus()});
+ requestAnimationFrame(()=>{if(matchMedia('(max-width:900px)').matches)panel.focus({preventScroll:true});else (editing?form.elements.name:form.elements.phone)?.focus()});
 }
 
 function bindAdmin(){
