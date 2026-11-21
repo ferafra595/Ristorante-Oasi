@@ -1638,3 +1638,10 @@ body.oasi-booking-drawer-open{overflow:hidden}
 .oasi-large-party-confirm{display:flex;align-items:flex-start;gap:11px;font-size:14px;font-weight:650;line-height:1.5}
 .oasi-large-party-confirm input{width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:#8b7151}
 @media(max-width:680px){.oasi-sala-head-actions{align-items:stretch;flex-direction:column;width:100%}.oasi-sala-head-actions .mini{width:100%}.oasi-operational-links{padding:12px}}
+
+/* OASI — selezione guidata tavoli dalla piantina operativa */
+.oasi-join-actions{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}
+.oasi-join-actions>.mini{flex:1 1 180px;min-height:42px}
+#oasi-pick-joined-tables{background:#edf4ea;border-color:#b9ceb1;color:#31512a;font-weight:700}
+#oasi-linked-table-choices:empty{display:none}
+@media(max-width:700px){.oasi-join-actions{flex-direction:column}.oasi-join-actions>.mini{width:100%;flex:auto}}
