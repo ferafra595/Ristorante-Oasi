@@ -858,7 +858,7 @@ function openNewBookingDrawer(_event=null,editing=null){
    <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="Numero di telefono"></label>
    <label>Nome cliente *<input name="name" required maxlength="120" autocomplete="name" placeholder="Nome e cognome"></label>
    <label>Email *<input name="email" type="email" required maxlength="180" autocomplete="email" placeholder="nome@esempio.it"></label>
-   ${banquet&&!editing?`<section class="oasi-banquet-tables"><h3>Tavoli del banchetto</h3><p>Seleziona più gruppi di tavoli separati nella stessa sala. Gli altri restano disponibili per le prenotazioni normali.</p><label>Sala<select id="oasi-banquet-room"></select></label><div id="oasi-banquet-list" aria-live="polite"></div><p id="oasi-banquet-capacity" aria-live="polite"></p><button class="mini" type="button" id="oasi-banquet-refresh">Aggiorna disponibilità</button></section>`:editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
+   ${banquet&&!editing?`<section class="oasi-banquet-tables"><h3>Tavoli del banchetto</h3><p>Seleziona fino a 20 tavoli: puoi riservare più gruppi verticali separati (es. 4 + 2 e 3 + 5 + 6). Gli altri tavoli restano prenotabili.</p><label>Sala<select id="oasi-banquet-room"></select></label><div id="oasi-banquet-list" aria-live="polite"></div><p id="oasi-banquet-capacity" aria-live="polite"></p><button class="mini" type="button" id="oasi-banquet-refresh">Aggiorna disponibilità</button></section>`:editing?`<section class="oasi-edit-tables"><h3>Assegnazione tavoli</h3><label>Sala<select name="edit_room"></select></label><div id="oasi-edit-table-list" aria-live="polite"></div><div class="oasi-edit-recommend-tools"><button type="button" class="mini" id="oasi-edit-recommend">Suggerisci tavoli</button><button type="button" class="mini" id="oasi-edit-refresh">Aggiorna disponibilità</button></div><p id="oasi-edit-capacity" aria-live="polite"></p></section>`:`<section class="oasi-quick-suggestion"><h3>Assegnazione intelligente</h3><label>Scelta tavolo<select name="suggested_table"><option value="">Automatica · miglior tavolo disponibile</option></select></label><p id="oasi-suggestion-hint" role="status" aria-live="polite">Ricerca dei tavoli disponibili…</p><div class="oasi-large-party" id="oasi-large-party" hidden><p><strong>Gruppo oltre 9 persone</strong> · Seleziona una combinazione di tavoli collegati. Nessuna unione verrà effettuata senza la tua conferma.</p><label class="oasi-large-party-confirm"><input type="checkbox" id="oasi-join-confirm"> Confermo di voler unire i tavoli selezionati per questa prenotazione</label></div></section>`}
    <label>Note (facoltative)<textarea name="notes" rows="3" placeholder="Richieste particolari..."></textarea></label>
    <p class="oasi-booking-drawer-hint">Se il cliente è già registrato, selezionalo dai suggerimenti. Eventi privati, blocchi e tavoli occupati vengono verificati al salvataggio.</p></div>
    <footer class="oasi-booking-drawer-actions"><button type="button" class="btn btn-outline oasi-booking-drawer-cancel">Annulla</button><button type="submit" class="btn btn-dark oasi-booking-drawer-submit">${editing?'Salva modifiche':'Registra prenotazione'}</button></footer>
@@ -949,13 +949,16 @@ function openNewBookingDrawer(_event=null,editing=null){
  }
  if(banquet&&!editing){
   const roomEl=form.querySelector('#oasi-banquet-room'),list=form.querySelector('#oasi-banquet-list'),capacity=form.querySelector('#oasi-banquet-capacity');
-  let tables=[],chosen=new Set(),loading=false,version=0;
+  let tables=[],chosen=new Set(),banquetLinks=[],loading=false,version=0;
   const check=()=>{
    const selected=tables.filter(t=>chosen.has(Number(t.id))&&Number(t.room_id)===Number(roomEl.value));
    const min=selected.reduce((sum,t)=>sum+Number(t.min_seats||1),0),max=selected.reduce((sum,t)=>sum+Number(t.seats||0),0);
    const party=Number(form.elements.party_size.value);
    const valid=!loading&&selected.length>0&&selected.length<=20&&Number.isInteger(party)&&party>=min&&party<=max;
-   capacity.textContent=selected.length?selected.length+' tavoli selezionati · '+min+'–'+max+' posti. '+(valid?'Capienza compatibile.':'Numero di ospiti non compatibile o limite di 20 tavoli superato.'):'Seleziona i tavoli da riservare al banchetto.';
+   const ids=selected.map(t=>Number(t.id)),remaining=new Set(ids),groups=[];
+   const validLinks=banquetLinks.filter(l=>{const a=selected.find(t=>Number(t.id)===Number(l.table_a)),b=selected.find(t=>Number(t.id)===Number(l.table_b));return a&&b&&oasiNearbyTable(a,b)});
+   while(remaining.size){const root=remaining.values().next().value;const component=oasiLinkedComponent(root,ids,validLinks);const group=selected.filter(t=>component.has(Number(t.id))).map(t=>t.code);groups.push(group.join(' + '));for(const id of component)remaining.delete(id)}
+   capacity.textContent=selected.length?selected.length+' tavoli selezionati · '+min+'–'+max+' posti. '+(valid?'Capienza compatibile.':'Numero di ospiti non compatibile o limite di 20 tavoli superato.')+' Gruppi: '+groups.join(' | '):'Seleziona i tavoli da riservare al banchetto.';
    submit.disabled=saving||!valid;
    return {valid,selected};
   };
@@ -975,6 +978,7 @@ function openNewBookingDrawer(_event=null,editing=null){
     const prior=roomEl.value;
     roomEl.innerHTML=rooms.map(r=>'<option value="'+Number(r.id)+'">'+esc(r.name)+'</option>').join('');
     if(rooms.some(r=>String(r.id)===prior))roomEl.value=prior;
+    banquetLinks=result.links||[];
     tables=(result.tables||[]).filter(t=>Number(t.enabled)&&rooms.some(r=>Number(r.id)===Number(t.room_id))&&!busy.has(Number(t.id))&&!closed.has(Number(t.id)));
     chosen=new Set([...chosen].filter(id=>tables.some(t=>Number(t.id)===id&&Number(t.room_id)===Number(roomEl.value))));
     loading=false;paint();
