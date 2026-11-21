@@ -229,20 +229,20 @@ const dateIt=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'
 async function bookingUnavailableReason(db,roomIds,date,service,party,admin=false){
  const when=`${serviceIt(service)} del ${dateIt(date)}`;
  const rooms=[...new Set(roomIds.map(Number).filter(n=>Number.isSafeInteger(n)&&n>0))];
- if(!rooms.length)return 'Nessuna sala abilitata alle prenotazioni. Contatta il ristorante.';
+ if(!rooms.length)return admin?'Nessuna sala abilitata alle prenotazioni. Contatta il ristorante.':'Al momento non è possibile prenotare online per questa data. Contatta il ristorante.';
  const blocks=await serviceBlocks(db,date,service);
  const serviceBlock=blocks.find(x=>x.scope==='service');
- if(serviceBlock)return `Prenotazioni non disponibili per il ${when}: il servizio è stato chiuso dall’ADMIN${admin&&serviceBlock.reason?' ('+clean(serviceBlock.reason,120)+')':''}.`;
+ if(serviceBlock)return `Non è possibile prenotare per il ${when}: il servizio non accetta nuove prenotazioni${admin&&serviceBlock.reason?' ('+clean(serviceBlock.reason,120)+')':''}.`;
  const eventRooms=new Set(blocks.filter(x=>x.scope==='room'&&x.source==='event').map(x=>Number(x.target_id)));
  const manualRooms=new Set(blocks.filter(x=>x.scope==='room'&&x.source!=='event').map(x=>Number(x.target_id)));
  const usable=rooms.filter(id=>!eventRooms.has(id)&&!manualRooms.has(id));
  if(!usable.length){
   if(rooms.every(id=>eventRooms.has(id)))return `Prenotazione non consentita per il ${when}: tutte le sale sono riservate per una cerimonia o un evento privato.`;
-  if(rooms.every(id=>manualRooms.has(id)))return `Prenotazioni non disponibili per il ${when}: tutte le sale sono state bloccate dall’ADMIN.`;
-  return `Prenotazioni non disponibili per il ${when}: le sale sono riservate per eventi privati oppure bloccate dall’ADMIN.`;
+  if(rooms.every(id=>manualRooms.has(id)))return `Non è possibile prenotare per il ${when}: le sale non accettano nuove prenotazioni.`;
+  return `Non è possibile prenotare per il ${when}: le sale non sono disponibili. Scegli un altro giorno oppure contatta il ristorante.`;
  }
  const eventNote=rooms.some(id=>eventRooms.has(id))?' Alcune sale sono riservate per una cerimonia o un evento privato.':'';
- const blockedNote=rooms.some(id=>manualRooms.has(id))?' Alcune sale sono bloccate dall’ADMIN.':'';
+ const blockedNote=rooms.some(id=>manualRooms.has(id))?' Alcune sale non sono disponibili per questo servizio.':'';
  const data=await db.prepare(`SELECT t.id,t.room_id,t.seats,COALESCE(d.min_seats,1) min_seats,
  EXISTS(SELECT 1 FROM reservation_tables rt WHERE rt.table_id=t.id AND rt.book_date=? AND rt.service=?) busy
  FROM tables t LEFT JOIN table_details d ON d.table_id=t.id
@@ -250,8 +250,8 @@ async function bookingUnavailableReason(db,roomIds,date,service,party,admin=fals
  const configured=data.results||[];
  const blockedTables=new Set(blocks.filter(x=>x.scope==='table').map(x=>Number(x.target_id)));
  const unblocked=configured.filter(t=>!blockedTables.has(Number(t.id)));
- if(!configured.length)return `Nessun tavolo attivo nelle sale disponibili per il ${when}.${eventNote}${blockedNote}`;
- if(!unblocked.length)return `Tutti i tavoli delle sale disponibili sono stati bloccati per il ${when}.${eventNote}${blockedNote}`;
+ if(!configured.length)return admin?`Nessun tavolo attivo nelle sale disponibili per il ${when}.${eventNote}${blockedNote}`:`Per il ${when} non risultano tavoli prenotabili online. Contatta il ristorante.${eventNote}`;
+ if(!unblocked.length)return `Per il ${when} i tavoli non sono disponibili. Scegli un altro orario o contatta il ristorante.${eventNote}`;
  const possibleByRoom=new Map();
  for(const t of unblocked)possibleByRoom.set(Number(t.room_id),(possibleByRoom.get(Number(t.room_id))||0)+Number(t.seats||0));
  if(Math.max(...possibleByRoom.values(),0)<party)return `Capienza insufficiente: nessuna sala disponibile può accogliere ${party} persone per il ${when}.${eventNote}${blockedNote}`;
