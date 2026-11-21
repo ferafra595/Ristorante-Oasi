@@ -501,7 +501,51 @@ function enableImageUpload(zone){
  // Attach outside the enclosing label, avoiding nested labels and Safari input issues.
  target.closest('label').after(block);
  const image=block.querySelector('img'),empty=block.querySelector('.oasi-media-preview span'),feedback=block.querySelector('.upload-feedback'),fileInput=block.querySelector('input[type=file]'),button=block.querySelector('[data-upload]'),clear=block.querySelector('[data-clear]');
- const refresh=()=>{const url=mediaUrl(target.value.trim());image.hidden=!url;empty.hidden=!!url;if(url)image.src=url;else image.removeAttribute('src')};
+ const card=target.closest('.oasi-media-card'),focal=card?.querySelector('.oasi-focal-editor'),crop=focal?.querySelector('.oasi-focal-preview'),cropImage=crop?.querySelector('img'),cropEmpty=crop?.querySelector('.oasi-focal-placeholder');
+ const axisX=focal?.querySelector('[data-focal-axis="X"]'),axisY=focal?.querySelector('[data-focal-axis="Y"]');
+ const updateFocal=()=>{
+  if(!focal)return;
+  const x=Number(axisX.value),y=Number(axisY.value);
+  focal.querySelector('[data-focal-output="X"]').textContent=x+'%';
+  focal.querySelector('[data-focal-output="Y"]').textContent=y+'%';
+  cropImage.style.objectPosition=x+'% '+y+'%';
+  crop.style.setProperty('--focal-x',x+'%');
+  crop.style.setProperty('--focal-y',y+'%');
+ };
+ const refreshCrop=()=>{
+  if(!crop)return;
+  const url=mediaUrl(target.value.trim());
+  cropImage.hidden=!url;cropEmpty.hidden=!!url;
+  if(url){if(cropImage.getAttribute('src')!==url)cropImage.src=url;}else cropImage.removeAttribute('src');
+  updateFocal();
+ };
+ if(focal){
+  axisX.addEventListener('input',updateFocal);
+  axisY.addEventListener('input',updateFocal);
+  focal.querySelector('.oasi-focal-reset')?.addEventListener('click',()=>{
+   axisX.value='50';axisY.value='50';updateFocal();
+  });
+  // L'utente può indicare direttamente il punto da valorizzare con mouse o touch.
+  let dragging=false;
+  const moveFocal=e=>{
+   const rect=crop.getBoundingClientRect();
+   if(!rect.width||!rect.height)return;
+   axisX.value=String(Math.min(100,Math.max(0,Math.round((e.clientX-rect.left)*100/rect.width))));
+   axisY.value=String(Math.min(100,Math.max(0,Math.round((e.clientY-rect.top)*100/rect.height))));
+   updateFocal();
+  };
+  crop.addEventListener('pointerdown',e=>{
+   if(!mediaUrl(target.value.trim()))return;
+   dragging=true;crop.setPointerCapture?.(e.pointerId);moveFocal(e);
+  });
+  crop.addEventListener('pointermove',e=>{if(dragging)moveFocal(e)});
+  const endDrag=()=>{dragging=false};
+  crop.addEventListener('pointerup',endDrag);
+  crop.addEventListener('pointercancel',endDrag);
+  cropImage.onerror=()=>{cropImage.hidden=true;cropEmpty.hidden=false;cropEmpty.textContent='Anteprima non disponibile'};
+  cropImage.onload=()=>{cropImage.hidden=false;cropEmpty.hidden=true};
+ }
+ const refresh=()=>{const url=mediaUrl(target.value.trim());image.hidden=!url;empty.hidden=!!url;if(url)image.src=url;else image.removeAttribute('src');refreshCrop()};
  image.onerror=()=>{image.hidden=true;empty.hidden=false;empty.textContent='Anteprima non disponibile'};image.onload=()=>{image.hidden=false;empty.hidden=true;empty.textContent='Nessuna immagine'};
  target.addEventListener('input',refresh);refresh();
  clear.onclick=()=>{target.value='';fileInput.value='';empty.textContent='Nessuna immagine';refresh();feedback.textContent='Rimossa. Salva per pubblicare.'};
