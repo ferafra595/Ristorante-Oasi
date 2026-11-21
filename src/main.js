@@ -845,7 +845,7 @@ function openNewBookingDrawer(_event=null,editing=null){
  const old=document.querySelector('.oasi-booking-drawer-layer');
  if(old){old.querySelector('.oasi-booking-drawer-close')?.click();if(old.isConnected)return;}
  const layer=document.createElement('div');layer.className='oasi-booking-drawer-layer';
- const startService=editing?editing.service:(state.reservationService==='all'?oasiItalianService():state.reservationService);
+ const startService=editing?editing.service:(banquet?(state.opsService||oasiItalianService()):(state.reservationService==='all'?oasiItalianService():state.reservationService));
  layer.innerHTML=`<button type="button" class="oasi-booking-drawer-shade" aria-label="Chiudi nuova prenotazione"></button>
  <aside class="oasi-booking-drawer" role="dialog" aria-modal="true" aria-labelledby="oasi-new-book-title" tabindex="-1">
   <header class="oasi-booking-drawer-header"><div><span class="eyebrow">RISTORANTE OASI · ADMIN</span><h2 id="oasi-new-book-title">${editing?'Modifica prenotazione #'+Number(editing.id):'Nuova prenotazione'}</h2><p>${editing?'Modifica tutti i dati e scegli i tavoli disponibili.':banquet?'Riserva soltanto i tavoli del banchetto: gli altri rimangono prenotabili.':'Inserisci una prenotazione telefonica. Il tavolo viene assegnato in base alla disponibilità.'}</p></div><button class="oasi-booking-drawer-close" type="button" aria-label="Chiudi pannello">×</button></header>
