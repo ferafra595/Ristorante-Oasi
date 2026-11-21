@@ -116,7 +116,7 @@ const oasiWinterOverflowAllowed=cfg=>
  cfg?.seasonMode==='winter'&&cfg?.firstFloorOverflowEnabled===true
  &&Number.isSafeInteger(Number(cfg?.firstFloorOverflowCapacity))
  &&Number(cfg.firstFloorOverflowCapacity)>0&&Number(cfg.firstFloorOverflowCapacity)<=500;
-async function oasiOverflowCandidate(db,cfg,date,service,party){
+async function oasiOverflowCandidate(db,cfg,date,service,party,excludeId=0){
  if(!oasiWinterOverflowAllowed(cfg)||cfg?.disabledDatesByRoom?.['2']?.includes(date))return null;
  if(!(await db.prepare('SELECT version FROM oasi_schema_versions WHERE version=12').first().catch(()=>null)))return null;
  const room=await db.prepare('SELECT id,name,internal_enabled FROM rooms WHERE id=2').first();
@@ -124,7 +124,7 @@ async function oasiOverflowCandidate(db,cfg,date,service,party){
  // La piantina del primo piano non è necessaria; non assegniamo tavoli fittizi.
  const blocks=await serviceBlocks(db,date,service);
  if(blocks.some(b=>b.scope==='service'||(b.scope==='room'&&Number(b.target_id)===2)))return null;
- const existing=await db.prepare("SELECT COALESCE(SUM(party_size),0) n FROM reservations WHERE room_id=2 AND book_date=? AND service=? AND status='confirmed'").bind(date,service).first();
+ const existing=await db.prepare("SELECT COALESCE(SUM(party_size),0) n FROM reservations WHERE room_id=2 AND book_date=? AND service=? AND status='confirmed' AND id<>?").bind(date,service,excludeId).first();
  const used=Number(existing?.n||0),cap=Number(cfg.firstFloorOverflowCapacity);
  if(used+party>cap)return null;
  return {ids:[],room_id:2,capacity:cap-used,code:'Senza tavolo · Primo piano',overflow:true};
@@ -644,8 +644,9 @@ if(resource==='reservations'){if(method==='GET'){const q=new URL(ctx.request.url
  const moving=d!==old.book_date||svc!==old.service;
  const visit=await db.prepare('SELECT state FROM service_visits WHERE reservation_id=?').bind(id).first();
  if(moving&&visit&&visit.state!=='expected')return fail('Ripristina lo stato Atteso prima di cambiare data o servizio.',409);
- const candidate=await manualTableCandidate(db,ids,d,svc,party,b.table_ids,id,old.source==='staff_banquet');
- if(!candidate)return fail(Array.isArray(b.table_ids)&&b.table_ids.length?await manualTableUnavailableReason(db,ids,d,svc,party,b.table_ids,id,old.source==='staff_banquet'):'Seleziona almeno un tavolo disponibile.',409);
+ const upstairsNoTable=Number(b.room_id)===2 && Array.isArray(b.table_ids) && b.table_ids.length===0 && old.source!=='staff_banquet';
+ const candidate=upstairsNoTable?await oasiOverflowCandidate(db,v.cfg,d,svc,party,id):await manualTableCandidate(db,ids,d,svc,party,b.table_ids,id,old.source==='staff_banquet');
+ if(!candidate)return fail(upstairsNoTable?'Primo piano non disponibile: controlla modalità inverno, capienza e blocchi.':Array.isArray(b.table_ids)&&b.table_ids.length?await manualTableUnavailableReason(db,ids,d,svc,party,b.table_ids,id,old.source==='staff_banquet'):'Seleziona almeno un tavolo disponibile.',409);
  try{
   await db.batch([
    db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM reservations WHERE id=? AND ${fields.map(k=>k+' IS ?').join(' AND ')}) AND COALESCE((SELECT group_concat(table_id,',') FROM (SELECT table_id FROM reservation_tables WHERE reservation_id=? ORDER BY table_id)),'')=? AND (?=0 OR COALESCE((SELECT state FROM service_visits WHERE reservation_id=?),'expected')='expected') THEN 1 ELSE json('oasi_stale_edit') END guard`).bind(id,...fields.map(k=>old[k]),id,originalIds.join(','),moving?1:0,id),
