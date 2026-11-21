@@ -93,7 +93,7 @@ async function eventRoomBlocked(db,date,service,roomId){
 async function operationsData(db,date,service){
  
  const filter=service==='all'?'':' AND r.service=?';const params=service==='all'?[date]:[date,service];
- const [reservations,rooms,tables,blocks,eventRows,zones]=await db.batch([
+ const [reservations,rooms,tables,blocks,eventRows,zones,links]=await db.batch([
   db.prepare(`SELECT r.*,COALESCE(v.state,'expected') visit_state,COALESCE(v.note,'') visit_note,GROUP_CONCAT(t.id) table_ids,GROUP_CONCAT(t.code,', ') table_codes FROM reservations r LEFT JOIN service_visits v ON v.reservation_id=r.id LEFT JOIN reservation_tables rt ON rt.reservation_id=r.id LEFT JOIN tables t ON t.id=rt.table_id WHERE r.book_date=?${filter} GROUP BY r.id ORDER BY CASE r.service WHEN 'lunch' THEN 0 ELSE 1 END,r.time,r.id`).bind(...params),
   db.prepare('SELECT id,name,public_enabled,internal_enabled FROM rooms ORDER BY sort_order,id'),
   db.prepare('SELECT t.*,COALESCE(d.min_seats,1) min_seats FROM tables t LEFT JOIN table_details d ON d.table_id=t.id ORDER BY t.room_id,t.id'),
@@ -102,11 +102,12 @@ async function operationsData(db,date,service){
  FROM oasi_event_rooms er JOIN oasi_private_events e ON e.id=er.event_id
  WHERE e.status<>'cancelled' AND ? BETWEEN e.start_date AND e.end_date
  AND (?='all' OR e.service='both' OR e.service=?)`).bind(date,service,service),
-  db.prepare('SELECT * FROM room_zones ORDER BY room_id,id')
+  db.prepare('SELECT * FROM room_zones ORDER BY room_id,id'),
+  db.prepare('SELECT table_a,table_b FROM table_links ORDER BY table_a,table_b')
  ]);
  const eventBlocks=(eventRows.results||[]).flatMap(x=>(x.event_service==='both'?['lunch','dinner']:[x.event_service])
   .filter(s=>service==='all'||service===s).map(s=>({id:'event:'+x.event_id+':'+x.room_id+':'+s,scope:'room',target_id:x.room_id,service:s,reason:'Sala riservata per evento privato',event_id:x.event_id,source:'event'})));
- return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:[...(blocks.results||[]),...eventBlocks],zones:zones.results||[]};
+ return {date,service,reservations:reservations.results||[],rooms:rooms.results||[],tables:tables.results||[],blocks:[...(blocks.results||[]),...eventBlocks],zones:zones.results||[],links:links.results||[]};
 }
 async function candidates(db,roomIds,date,service,party){
  if(!roomIds.length)return [];
@@ -126,6 +127,28 @@ async function candidates(db,roomIds,date,service,party){
  const seen=new Set();
  for(const root of free){const queue=[[root.id]];while(queue.length){const group=queue.shift();if(group.length>=6)continue;const next=new Set(group.flatMap(id=>adj.get(id)||[]));for(const id of next){if(group.includes(id))continue;const ids=[...group,id].sort((a,b)=>a-b);const key=ids.join('-');if(seen.has(key))continue;seen.add(key);const members=ids.map(i=>byId.get(i));const capacity=members.reduce((s,t)=>s+t.seats,0),minimum=members.reduce((s,t)=>s+Number(t.min_seats||1),0);if(capacity>=party&&minimum<=party)options.push({ids,room_id:root.room_id,capacity,code:members.map(t=>t.code).join('+')});if(ids.length<6)queue.push(ids)}}}
  return rankTableOptions(options,party);
+}
+// Una combinazione di tavoli è valida solo se forma una rete connessa
+// di collegamenti esplicitamente definiti nella piantina standard.
+function oasiConnectedTableIds(ids,links){
+ if(ids.length<=1)return true;
+ const allowed=new Set(ids.map(Number)),visited=new Set([Number(ids[0])]);
+ let changed=true;
+ while(changed){
+  changed=false;
+  for(const link of links){
+   const a=Number(link.table_a),b=Number(link.table_b);
+   if(!allowed.has(a)||!allowed.has(b))continue;
+   if(visited.has(a)&&!visited.has(b)){visited.add(b);changed=true}
+   else if(visited.has(b)&&!visited.has(a)){visited.add(a);changed=true}
+  }
+ }
+ return visited.size===allowed.size;
+}
+async function oasiLinkedTables(db,ids){
+ if(ids.length<2)return true;
+ const links=(await db.prepare('SELECT table_a,table_b FROM table_links').all()).results||[];
+ return oasiConnectedTableIds(ids,links);
 }
 // Staff-only choice: a temporary group of free tables in the same room.
 // Does NOT modify the standard floor plan or allow public customers to bypass linked-table rules.
@@ -150,6 +173,7 @@ async function manualTableCandidate(db,roomIds,date,service,party,selected,exclu
  const max=tables.reduce((n,t)=>n+Number(t.seats),0);
  const min=tables.reduce((n,t)=>n+Number(t.min_seats),0);
  if(party<min||party>max)return null;
+ if(!(await oasiLinkedTables(db,ids)))return null;
  return {ids,room_id:roomId,capacity:max,code:tables.map(t=>t.code).join('+')};
 }
 // Analizza le cause reali di indisponibilità, senza confondere cerimonie,
@@ -215,6 +239,7 @@ async function manualTableUnavailableReason(db,roomIds,date,service,party,select
  const occupied=await db.prepare(`SELECT DISTINCT t.code FROM reservation_tables rt JOIN tables t ON t.id=rt.table_id
  WHERE rt.book_date=? AND rt.service=? AND rt.reservation_id<>? AND rt.table_id IN (${marks})`).bind(date,service,excludeId,...ids).all();
  if(occupied.results?.length)return `Tavolo ${occupied.results.map(t=>t.code).join(', ')} già prenotato per il ${when}.`;
+ if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti non sono collegabili nella piantina. Seleziona tavoli adiacenti, collegati tra loro.';
  const max=tables.reduce((n,t)=>n+Number(t.seats),0),min=tables.reduce((n,t)=>n+Number(t.min_seats),0);
  if(party>max||party<min)return `Capienza non compatibile: i tavoli selezionati accolgono da ${min} a ${max} persone, mentre la prenotazione è per ${party}.`;
  return `Impossibile assegnare i tavoli scelti per il ${when}. Aggiorna la piantina e riprova.`;
