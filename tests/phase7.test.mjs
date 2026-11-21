@@ -64,3 +64,32 @@ test('online cancellation keeps booked tables after service starts and releases 
  ok(await x.call('cancel','POST',{token:token2},false));
  assert.deepEqual(x.assigned(b.body.id),[]);assert.equal(x.rows().find(r=>r.id===b.body.id).status,'cancelled');
 });
+
+
+test('ADMIN table suggestions are ranked, authenticated and exclude blocked tables',async()=>{
+ const x=await setup();
+ const endpoint='admin/suggestions?date='+date+'&service=lunch&party_size=2';
+ const unauthorized=await x.call(endpoint,'GET',undefined,false);
+ assert.equal(unauthorized.status,401);
+ const initial=await x.call(endpoint);
+ ok(initial);
+ assert.ok(initial.body.options.length);
+ assert.deepEqual(initial.body.options[0].table_ids,[6]);
+ ok(await x.block('table',6));
+ const afterBlock=await x.call(endpoint);
+ ok(afterBlock);
+ assert.ok(afterBlock.body.options.every(c=>!c.table_ids.includes(6)));
+ assert.deepEqual(afterBlock.body.options[0].table_ids,[3]);
+ const saved=await x.book([3],2);
+ ok(saved,201);
+ const afterBooking=await x.call(endpoint);
+ ok(afterBooking);
+ assert.ok(afterBooking.body.options.every(c=>!c.table_ids.includes(3)));
+});
+test('ADMIN table suggestions preserve validations for date, service and party size',async()=>{
+ const x=await setup();
+ for(const query of ['date=garbage&service=lunch&party_size=2','date='+date+'&service=all&party_size=2','date='+date+'&service=lunch&party_size=201']){
+  const response=await x.call('admin/suggestions?'+query);
+  assert.equal(response.status,400);
+ }
+});
