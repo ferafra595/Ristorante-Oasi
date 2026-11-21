@@ -21,3 +21,8 @@ bucket_name = "oasi-media"
 
 [vars]
 PUBLIC_URL = "https://ristorante-oasi.ferafra595.workers.dev"
+
+# Promemoria: il Worker controlla l'ora Europe/Rome e invia alle 17 locali.
+# 15 UTC durante l'ora legale, 16 UTC durante l'ora solare.
+[triggers]
+crons = ["0 15,16 * * *"]
