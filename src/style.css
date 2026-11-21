@@ -1657,3 +1657,13 @@ body.oasi-booking-drawer-open{overflow:hidden}
 #oasi-banquet-capacity{font-weight:650}
 #oasi-banquet-refresh{min-height:40px}
 @media(max-width:640px){.oasi-banquet-tables{padding:13px}#oasi-banquet-list{grid-template-columns:1fr;max-height:300px}}
+
+
+/* OASI — Interfaccia operativa Fase 2: eventi parziali e selezione rapida. */
+.oasi-banquet-tag{display:inline-flex;align-items:center;width:max-content;max-width:100%;border-radius:6px;background:#f5ead6;border:1px solid #ddc6a1;color:#79582b;font-size:11px;font-weight:750;line-height:1.35;padding:3px 7px;margin:4px 0}
+.oasi-agenda-entry-source{max-width:100%;overflow-wrap:anywhere}
+.oasi-banquet-actions{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap;margin:12px 0}
+.oasi-banquet-actions>.mini{flex:1 1 125px;min-height:42px}
+#oasi-banquet-suggest{background:#e5eee4;color:#315d3c;border-color:#a8c1ab;font-weight:750}
+#oasi-banquet-capacity{border-radius:11px;background:#fff;border:1px solid #e2d6c3;padding:12px 13px;line-height:1.5;color:#443726}
+@media(max-width:640px){.oasi-banquet-actions{display:grid;grid-template-columns:1fr}.oasi-banquet-actions>.mini{width:100%;min-height:46px}}
