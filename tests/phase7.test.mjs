@@ -46,6 +46,16 @@ test('banchetto condiviso: più gruppi di tavoli sotto una sola prenotazione, se
  ok(await x.book([6],2),201);
  assert.equal(x.rows().length,2);
 });
+test('banchetto condiviso: nove tavoli distinti in una prenotazione, senza ampliare il limite normale',async()=>{
+ const x=await setup();
+ for(let id=30;id<39;id++)x.db.sql.prepare('INSERT INTO tables(id,room_id,code,seats,x,y,w,h,enabled) VALUES(?,1,?,4,10,10,70,70,1)').run(id,String(id));
+ const ids=Array.from({length:9},(_,i)=>i+30);
+ rejected(await x.book(ids,27));
+ const booking=await x.book(ids,27,{banquet_shared:true});
+ ok(booking,201);
+ assert.deepEqual(x.assigned(booking.body.id),ids);
+ ok(await x.book([6],2),201);
+});
 test('banchetto condiviso: rifiuta tavoli di sale diverse, occupati o insufficienti',async()=>{
  const x=await setup();
  rejected(await x.book([1,4],12,{banquet_shared:true}));
