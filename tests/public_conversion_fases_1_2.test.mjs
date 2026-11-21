@@ -66,3 +66,12 @@ test('Homepage: accessi rapidi e storia priva di segnaposto editoriali',()=>{
  assert.ok(js.includes('oasi-hero-assurance'));
  assert.ok(!js.includes('Presto racconteremo qui ogni dettaglio della nostra esperienza.'));
 });
+
+test('Storia: i segnaposto in D1 sono sostituiti solo a video',()=>{
+ const start=js.indexOf('const oasiPublicStory='),end=js.indexOf('const editorialPhoto=',start);
+ assert.ok(start>=0&&end>start);
+ const story=new Function(js.slice(start,end)+'return oasiPublicStory;')();
+ assert.ok(!story('La nostra storia: aggiungi qui il tuo racconto dall’area ADMIN.').includes('aggiungi qui'));
+ assert.equal(story('La storia del ristorante scritta dal cliente.'),'La storia del ristorante scritta dal cliente.');
+ assert.ok(js.includes('oasiPublicStory(d.story)'));
+});
