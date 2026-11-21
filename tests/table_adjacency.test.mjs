@@ -25,7 +25,20 @@ test('La verifica è indipendente dal verso dei collegamenti',()=>{
 });
 test('Il server controlla collegamenti nella creazione, modifica e riassegnazione',()=>{
  assert.ok(server.includes('if(!(await oasiLinkedTables(db,ids)))return null;'));
- assert.ok(server.includes("if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti non sono collegabili"));
+ assert.ok(server.includes("if(!(await oasiLinkedTables(db,ids)))return 'I tavoli scelti devono essere collegati in verticale"));
  assert.ok(server.includes('const candidate=await manualTableCandidate('));
  assert.ok(frontend.includes('oasiConnectedTableIds(selectedTables,tableLinks)'));
+});
+
+test('Regola server: vieta collegamenti laterali e diagonali, ammette catene verticali',()=>{
+ const a=server.indexOf('const oasiVerticalPair='),b=server.indexOf('function oasiConnectedTableIds',a);
+ assert.ok(a>=0&&b>a);
+ const vertical=new Function(server.slice(a,b)+'return oasiVerticalPair;')();
+ const t=(x,y,w=55,h=100)=>({x,y,w,h});
+ assert.equal(vertical(t(650,100),t(650,220)),true);
+ assert.equal(vertical(t(530,100,55,60),t(530,180,55,90)),true);
+ assert.equal(vertical(t(530,180,55,90),t(530,295)),true);
+ assert.equal(vertical(t(530,180),t(650,100)),false);
+ assert.equal(vertical(t(650,100),t(760,100)),false);
+ assert.ok(server.includes('if(!oasiVerticalPair(rows[0],rows[1]))return fail('));
 });
